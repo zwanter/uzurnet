@@ -534,6 +534,22 @@ export async function setMainLanguage(lang: string): Promise<void> {
   await window.electron.ipcRenderer.invoke('setLanguage', lang)
 }
 
+export async function runAutoSelectProxy(): Promise<{
+  success: boolean
+  results: {
+    group: string
+    switched: boolean
+    previous: string
+    current: string
+    delay: number
+    testedCount: number
+    excludedCount: number
+  }[]
+  message?: string
+}> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('runAutoSelectProxy'))
+}
+
 // Override window.alert to use toast notifications instead of system dialogs
 async function alert<T>(msg: T): Promise<void> {
   const { toast } = await import('sonner')

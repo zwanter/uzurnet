@@ -28,7 +28,12 @@ export const defaultConfig: AppConfig = {
   groupDisplayLayout: 'double',
   autoLightweightMode: 'core',
   mainSwitchMode: 'tun',
-  useHotReloadProfile: true
+  useHotReloadProfile: true,
+  autoSelectLowestDelay: false,
+  autoSelectInterval: 10,
+  autoSelectTolerance: 30,
+  autoSelectExcludePatterns: '',
+  autoSelectNotify: true
 }
 
 export const defaultControledMihomoConfig: Partial<MihomoConfig> = {

@@ -7,7 +7,7 @@ const rawChangelog = readFileSync('changelog.md', 'utf-8')
 const { version } = JSON.parse(pkg)
 
 let changelog = extractVersionSection(rawChangelog, version)
-const downloadUrl = `https://github.com/coolcoala/koala-clash/releases/download/${version}`
+const downloadUrl = `https://github.com/zwanter/koala-clash/releases/download/${version}`
 const latest = {
   version,
   changelog

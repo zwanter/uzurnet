@@ -109,6 +109,11 @@ interface AppConfig {
   disableGPU: boolean
   mainSwitchMode?: 'tun' | 'sysproxy'
   useHotReloadProfile?: boolean
+  autoSelectLowestDelay?: boolean
+  autoSelectInterval?: number
+  autoSelectTolerance?: number
+  autoSelectExcludePatterns?: string
+  autoSelectNotify?: boolean
 }
 
 interface ProfileConfig {

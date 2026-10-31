@@ -15,6 +15,7 @@ import { initShortcut } from './resolve/shortcut'
 import { execSync, spawn } from 'child_process'
 import { createElevateTaskSync } from './sys/misc'
 import { initProfileUpdater } from './core/profileUpdater'
+import { restartAutoSelectTimer } from './resolve/autoSelector'
 import { existsSync, writeFileSync } from 'fs'
 import { exePath, taskDir } from './utils/dirs'
 import { showFloatingWindow } from './resolve/floatingWindow'
@@ -340,6 +341,7 @@ app.whenReady().then(async () => {
         })
         .then(async () => {
           await initProfileUpdater()
+          restartAutoSelectTimer()
         })
       coreStarted = true
     } catch (e) {

@@ -1,0 +1,171 @@
+name: Auto Upstream Sync & Release
+
+permissions:
+  contents: write
+  packages: write
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Check every night at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if versions match'
+        type: boolean
+        default: false
+      custom_version:
+        description: 'Custom version tag (leave empty for upstream latest)'
+        required: false
+        default: ''
+
+jobs:
+  check-and-sync:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      release_version: ${{ steps.check.outputs.release_version }}
+    steps:
+      - name: Checkout our repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check latest releases
+        id: check
+        shell: bash
+        run: |
+          UPSTREAM_TAG=$(curl -s https://api.github.com/repos/coolcoala/koala-clash/releases/latest | jq -r .tag_name)
+          MY_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)
+
+          echo "Upstream latest: $UPSTREAM_TAG"
+          echo "Current repo latest: $MY_TAG"
+
+          TARGET_VERSION="${{ github.event.inputs.custom_version }}"
+          if [ -z "$TARGET_VERSION" ]; then
+            TARGET_VERSION="$UPSTREAM_TAG"
+          fi
+
+          FORCE="${{ github.event.inputs.force_build }}"
+
+          if [ "$TARGET_VERSION" != "$MY_TAG" ] || [ "$FORCE" == "true" ] || [ "$MY_TAG" == "null" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "release_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+            echo "New version available to build: $TARGET_VERSION"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "Already up to date ($MY_TAG)."
+          fi
+
+      - name: Sync upstream changes safely
+        if: steps.check.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/coolcoala/koala-clash.git || true
+          git fetch upstream main || git fetch upstream master || true
+
+          # Merge upstream cleanly while preserving our custom additions:
+          git merge -X ours --no-edit upstream/main || git merge -X ours --no-edit upstream/master || true
+          
+          # Ensure package.json version matches target release version if needed
+          CLEAN_VER=$(echo "${{ steps.check.outputs.release_version }}" | sed 's/^v//')
+          if [ -n "$CLEAN_VER" ] && [ "$CLEAN_VER" != "null" ]; then
+            jq --arg ver "$CLEAN_VER" '.version = $ver' package.json > tmp.json && mv tmp.json package.json
+            git add package.json
+            git commit -m "chore: bump version to $CLEAN_VER" || true
+          fi
+
+          git push origin main || git push origin master || true
+
+  build-windows:
+    needs: check-and-sync
+    if: needs.check-and-sync.outputs.should_build == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies & prepare binaries
+        shell: bash
+        run: |
+          SKIP_PREPARE=1 pnpm install
+          pnpm prepare --x64
+
+      - name: Build Windows binaries
+        shell: bash
+        run: |
+          pnpm build:win
+
+      - name: Add Portable Flag
+        shell: pwsh
+        run: |
+          New-Item -Path "PORTABLE" -ItemType File -Force
+          Get-ChildItem dist/*portable.7z | ForEach-Object {
+            7z a $_.FullName PORTABLE
+          }
+
+      - name: Generate latest.yml & checksums
+        shell: bash
+        run: |
+          SKIP_CHANGELOG=1 pnpm updater
+          node scripts/checksum.mjs || true
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            dist/*.exe
+            dist/*.7z
+            dist/*.blockmap
+            latest.yml
+            changelog.md
+
+  publish-release:
+    needs: [check-and-sync, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release-files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-and-sync.outputs.release_version }}
+          name: Koala Clash ${{ needs.check-and-sync.outputs.release_version }} (Auto-Select & Themes)
+          body: |
+            ## 🚀 Koala Clash ${{ needs.check-and-sync.outputs.release_version }}
+            
+            Автоматическая сборка на базе официального релиза с встроенным дополнением:
+            - ⚡ **Автовыбор сервера по минимальному пингу** в фоне с защитой от скачков (Tolerance).
+            - 🛡️ **Черный список исключений** (серверы, которые никогда не будут выбраны).
+            - 🎨 **Встроенные темы оформления:** Cyber Neon и Nordic Frost.
+            - 🔄 **Автообновление:** приложение проверяет и устанавливает свежие релизы из этого репозитория.
+            
+            ### Файлы для загрузки:
+            - **`Koala.Clash_x64-setup.exe`** — Установщик для Windows 64-bit
+            - **`Koala.Clash_x64-portable.7z`** — Портативная версия (распакуйте и запускайте)
+          files: |
+            release-files/*.exe
+            release-files/*.7z
+            release-files/*.blockmap
+            release-files/latest.yml
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

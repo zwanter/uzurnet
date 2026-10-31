@@ -1,4 +1,26 @@
 export default {
+  autoSelect: {
+    cardTitle: 'Auto-Select Proxy (Lowest Ping)',
+    enable: 'Enable Auto-Select by Lowest Delay',
+    enableDesc: 'Periodically tests proxies and switches to the node with lowest latency',
+    triggerNow: 'Trigger Now',
+    triggerNowDesc: 'Run latency check and select best proxy immediately',
+    runButton: 'Select Best Proxy',
+    excludePatterns: 'Exclusions (Blacklist)',
+    excludeHelp: 'Comma-separated words or regexes to ignore. Example: RU, Russia, x2, VIP, Filter',
+    excludeDesc: 'Proxies matching these patterns will never be selected',
+    interval: 'Check Interval (Minutes)',
+    intervalDesc: 'How often to automatically check ping in background',
+    tolerance: 'Switching Tolerance (ms)',
+    toleranceHelp: 'Prevents frequent hopping. If current proxy is slower than best by less than this value, no switch occurs.',
+    toleranceDesc: 'Acceptable ping difference without switching',
+    notify: 'Notification on Switch',
+    notifyDesc: 'Show notification when a new best proxy is selected',
+    noCandidates: 'No available proxies',
+    switchedToast: 'Group [{{group}}]: selected {{proxy}} ({{delay}} ms)',
+    alreadyOptimal: 'Proxy [{{proxy}}] is already optimal ({{delay}} ms)',
+    noChanges: 'No change needed'
+  },
   common: {
     save: 'Save',
     cancel: 'Cancel',

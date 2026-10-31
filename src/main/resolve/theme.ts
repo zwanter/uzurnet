@@ -1,4 +1,4 @@
-import { copyFile, readdir, readFile, writeFile } from 'fs/promises'
+import { copyFile, readdir, readFile, writeFile, mkdir } from 'fs/promises'
 import { themesDir } from '../utils/dirs'
 import { t } from '../utils/i18n'
 import path from 'path'
@@ -13,7 +13,81 @@ import { floatingWindow } from './floatingWindow'
 let insertedCSSKeyMain: string | undefined = undefined
 let insertedCSSKeyFloating: string | undefined = undefined
 
+const BUILTIN_THEMES: Record<string, string> = {
+  'cyber-neon.css': `/* Cyber Neon */
+:root {
+  --radius: 0.75rem;
+}
+.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 7%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 263.4 90% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 14%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 6% 16%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 180 100% 50%;
+  --accent-foreground: 240 10% 4%;
+  --border: 240 6% 18%;
+  --input: 240 6% 18%;
+  --ring: 263.4 90% 60%;
+}
+.dark .card {
+  box-shadow: 0 4px 20px -2px rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.25);
+  transition: all 0.2s ease-in-out;
+}
+.dark .card:hover {
+  border-color: rgba(124, 58, 237, 0.45);
+}
+`,
+  'nordic-frost.css': `/* Nordic Frost */
+:root {
+  --radius: 0.75rem;
+}
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 40% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 40% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 18%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 172 66% 50%;
+  --accent-foreground: 222 47% 11%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 199 89% 48%;
+}
+.dark .card {
+  box-shadow: 0 4px 20px -2px rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.25);
+  transition: all 0.2s ease-in-out;
+}
+.dark .card:hover {
+  border-color: rgba(14, 165, 233, 0.45);
+}
+`
+}
+
 export async function resolveThemes(): Promise<{ key: string; label: string }[]> {
+  await mkdir(themesDir(), { recursive: true })
+  for (const [filename, content] of Object.entries(BUILTIN_THEMES)) {
+    const filePath = path.join(themesDir(), filename)
+    if (!existsSync(filePath)) {
+      await writeFile(filePath, content, 'utf-8').catch(() => {})
+    }
+  }
   const files = await readdir(themesDir())
   const themes = await Promise.all(
     files

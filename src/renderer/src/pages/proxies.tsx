@@ -9,8 +9,10 @@ import {
   getImageDataURL,
   mihomoChangeProxy,
   mihomoCloseAllConnections,
-  mihomoProxyDelay
+  mihomoProxyDelay,
+  runAutoSelectProxy
 } from '@renderer/utils/ipc'
+import { toast } from 'sonner'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso'
@@ -34,6 +36,7 @@ import {
   Scale,
   Shield,
   SlidersHorizontal,
+  Sparkles,
   Zap
 } from 'lucide-react'
 
@@ -87,6 +90,7 @@ const Proxies: React.FC = () => {
   const [delayingTick, setDelayingTick] = useState(0)
   const prevGroupsLengthRef = useRef(0)
   const [isSettingModalOpen, setIsSettingModalOpen] = useState(false)
+  const [isAutoSelecting, setIsAutoSelecting] = useState(false)
   const virtuosoRef = useRef<GroupedVirtuosoHandle>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const hasScrolledRef = useRef(false)
@@ -553,6 +557,51 @@ const Proxies: React.FC = () => {
             ) : (
               <ChevronsUpDown className="text-lg" />
             )}
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="app-nodrag"
+            title={t('autoSelect.runButton', 'Автовыбор сервера с минимальным пингом')}
+            disabled={isAutoSelecting}
+            onClick={async () => {
+              setIsAutoSelecting(true)
+              try {
+                const res = await runAutoSelectProxy()
+                if (!res.success) {
+                  toast.warning(res.message || t('autoSelect.noCandidates', 'Нет доступных серверов'))
+                  return
+                }
+                const switched = res.results.filter((r) => r.switched)
+                if (switched.length > 0) {
+                  switched.forEach((r) => {
+                    toast.success(
+                      t('autoSelect.switchedToast', {
+                        group: r.group,
+                        proxy: r.current,
+                        delay: r.delay,
+                        defaultValue: `Группа [${r.group}]: выбран ${r.current} (${r.delay} мс)`
+                      })
+                    )
+                  })
+                } else if (res.results[0]) {
+                  toast.info(
+                    t('autoSelect.alreadyOptimal', {
+                      proxy: res.results[0].current,
+                      delay: res.results[0].delay,
+                      defaultValue: `Сервер [${res.results[0].current}] уже оптимален (${res.results[0].delay} мс)`
+                    })
+                  )
+                }
+              } catch (e) {
+                toast.error(`${e}`)
+              } finally {
+                setIsAutoSelecting(false)
+                mutate()
+              }
+            }}
+          >
+            {isAutoSelecting ? <Spinner className="size-4" /> : <Sparkles className="text-lg text-amber-500" />}
           </Button>
           <Button
             size="icon-sm"

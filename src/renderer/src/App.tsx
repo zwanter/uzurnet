@@ -128,6 +128,31 @@ const App: React.FC = () => {
     }
     window.electron.ipcRenderer.on('needs-admin-setup', handleNeedsAdminSetup)
 
+    const handleAutoSelectCompleted = (
+      _event: unknown,
+      data: {
+        manual: boolean
+        results: { group: string; switched: boolean; current: string; delay: number }[]
+      }
+    ): void => {
+      if (data && data.results && !data.manual) {
+        const switched = data.results.filter((r) => r.switched)
+        if (switched.length > 0 && appConfig?.autoSelectNotify !== false) {
+          switched.forEach((r) => {
+            toast.success(
+              t('autoSelect.switchedToast', {
+                group: r.group,
+                proxy: r.current,
+                delay: r.delay,
+                defaultValue: `Автовыбор [${r.group}]: переключено на ${r.current} (${r.delay} мс)`
+              })
+            )
+          })
+        }
+      }
+    }
+    window.electron.ipcRenderer.on('autoSelectCompleted', handleAutoSelectCompleted)
+
     if (platform === 'win32') {
       needsFirstRunAdmin().then((needs) => {
         if (needs) setShowAdminRequired(true)
@@ -138,6 +163,7 @@ const App: React.FC = () => {
       window.electron.ipcRenderer.removeAllListeners('show-quit-confirm')
       window.electron.ipcRenderer.removeAllListeners('show-profile-install-confirm')
       window.electron.ipcRenderer.removeAllListeners('needs-admin-setup')
+      window.electron.ipcRenderer.removeAllListeners('autoSelectCompleted')
       window.electron.ipcRenderer.removeAllListeners('showError')
     }
   }, [])
