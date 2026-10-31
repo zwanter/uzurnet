@@ -26,10 +26,10 @@ win:
   target:
     - nsis
     - 7z
-  artifactName: ${productName}_${arch}-portable.${ext}
+  artifactName: Koala.Clash_${arch}-portable.${ext}
 nsis:
-  artifactName: ${productName}_${arch}-setup.${ext}
-  uninstallDisplayName: ${productName}
+  artifactName: Koala.Clash_${arch}-setup.${ext}
+  uninstallDisplayName: Koala.Clash
   allowToChangeInstallationDirectory: true
   oneClick: false
   perMachine: true
@@ -47,7 +47,7 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  artifactName: ${productName}_${arch}.${ext}
+  artifactName: Koala.Clash_${arch}.${ext}
 pkg:
   allowAnywhere: false
   allowCurrentUserHome: false
@@ -65,13 +65,13 @@ linux:
     - pacman
   maintainer: coolcoala
   category: Utility
-  artifactName: ${productName}_${arch}.${ext}
+  artifactName: Koala.Clash_${arch}.${ext}
 deb:
   afterInstall: 'build/linux/postinst'
 rpm:
   afterInstall: 'build/linux/postinst'
 pacman:
   afterInstall: 'build/linux/postinst'
-  artifactName: ${productName}_${arch}.pkg.tar.xz
+  artifactName: Koala.Clash_${arch}.pkg.tar.xz
 npmRebuild: true
 publish: []

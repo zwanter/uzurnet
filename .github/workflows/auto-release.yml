@@ -122,16 +122,21 @@ jobs:
           SKIP_CHANGELOG=1 pnpm updater
           node scripts/checksum.mjs || true
 
+      - name: Prepare Release Directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "release-out" -Force
+          Copy-Item -Path "dist\*.exe" -Destination "release-out\" -Force
+          Copy-Item -Path "dist\*.7z" -Destination "release-out\" -Force
+          Copy-Item -Path "dist\*.blockmap" -Destination "release-out\" -Force
+          Copy-Item -Path "latest.yml" -Destination "release-out\" -Force
+          Copy-Item -Path "changelog.md" -Destination "release-out\" -Force
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: |
-            dist/*.exe
-            dist/*.7z
-            dist/*.blockmap
-            latest.yml
-            changelog.md
+          path: release-out/
 
   publish-release:
     needs: [check-and-sync, build-windows]
@@ -143,7 +148,7 @@ jobs:
           name: windows-release
           path: release-files/
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.check-and-sync.outputs.release_version }}
@@ -160,11 +165,7 @@ jobs:
             ### Файлы для загрузки:
             - **`Koala.Clash_x64-setup.exe`** — Установщик для Windows 64-bit
             - **`Koala.Clash_x64-portable.7z`** — Портативная версия (распакуйте и запускайте)
-          files: |
-            release-files/*.exe
-            release-files/*.7z
-            release-files/*.blockmap
-            release-files/latest.yml
+          files: release-files/*
           draft: false
           prerelease: false
         env:
