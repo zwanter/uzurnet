@@ -14,14 +14,14 @@ const SettingItem: React.FC<Props> = (props) => {
 
   return (
     <>
-      <div className="h-[32px] w-full flex items-center justify-between gap-4">
-        <div className="h-full flex items-center">
-          <h4 className="h-full text-md leading-[32px] whitespace-nowrap">{title}</h4>
-          <div>{actions}</div>
+      <div className="min-h-[44px] py-1.5 w-full flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-[13.5px] font-normal text-white/90 leading-tight select-text">{title}</div>
+          {actions && <div className="shrink-0">{actions}</div>}
         </div>
-        {children}
+        <div className="shrink-0 flex items-center">{children}</div>
       </div>
-      {divider && <Separator className="my-2" />}
+      {divider && <Separator className="bg-white/[0.05] my-1" />}
     </>
   )
 }

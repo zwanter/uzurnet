@@ -41,8 +41,7 @@ interface AppearanceConfigProps {
   showHiddenSettings: boolean
 }
 
-const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
-  const { showHiddenSettings } = props
+const AppearanceConfig: React.FC<AppearanceConfigProps> = () => {
   const { t } = useTranslation()
   const { appConfig, patchAppConfig } = useAppConfig()
   const [customThemes, setCustomThemes] = useState<{ key: string; label: string }[]>()
@@ -199,7 +198,7 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
             }}
           />
         </SettingItem>
-        <SettingItem title={t('settings.appearance.backgroundColor')} divider={showHiddenSettings}>
+        <SettingItem title={t('settings.appearance.backgroundColor')} divider>
           <Tabs
             value={appTheme}
             onValueChange={(value) => {
@@ -214,9 +213,8 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
             </TabsList>
           </Tabs>
         </SettingItem>
-        {showHiddenSettings && (
-          <SettingItem
-            title={t('settings.appearance.theme')}
+        <SettingItem
+          title={t('settings.appearance.theme')}
             actions={
               <>
                 <Button
@@ -296,7 +294,6 @@ const AppearanceConfig: React.FC<AppearanceConfigProps> = (props) => {
               </Select>
             )}
           </SettingItem>
-        )}
       </SettingCard>
     </>
   )

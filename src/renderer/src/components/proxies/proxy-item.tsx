@@ -22,10 +22,10 @@ interface Props {
 }
 
 function delayColorClass(delay: number): string {
-  if (delay === -1) return 'text-primary'
-  if (delay === 0) return 'text-destructive'
-  if (delay < 500) return 'text-success'
-  return 'text-warning'
+  if (delay === -1) return 'text-[#0078D4]'
+  if (delay === 0) return 'text-rose-400'
+  if (delay < 500) return 'text-emerald-400'
+  return 'text-amber-400'
 }
 
 const ProxyItem: React.FC<Props> = React.memo((props) => {
@@ -98,10 +98,10 @@ const ProxyItem: React.FC<Props> = React.memo((props) => {
       className={cn(
         'w-full gap-0 py-0 rounded-lg cursor-pointer transition-all duration-150 relative overflow-hidden',
         fixed
-          ? 'bg-amber-500/8 hover:bg-amber-500/12 border-amber-500/40 shadow-sm shadow-amber-500/10'
+          ? 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/50 shadow-xs'
           : selected
-            ? 'bg-primary/10 hover:bg-primary/15 border-primary/30 shadow-sm shadow-primary/10'
-            : 'hover:bg-accent/50'
+            ? 'bg-[#0078D4]/15 border-[#0078D4] shadow-[0_0_0_1px_#0078D4,0_2px_8px_rgba(0,120,212,0.25)]'
+            : 'bg-white/[0.04] border-white/[0.07] hover:bg-white/[0.07] hover:border-white/[0.12]'
       )}
     >
       <CardContent className="pl-4 pr-4 py-2">
