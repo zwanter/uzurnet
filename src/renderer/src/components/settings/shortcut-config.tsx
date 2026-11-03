@@ -8,6 +8,7 @@ import { useAppConfig } from '@renderer/hooks/use-app-config'
 import React, { KeyboardEvent, useState, useEffect } from 'react'
 import { platform } from '@renderer/utils/init'
 import { registerShortcut } from '@renderer/utils/ipc'
+import { X } from 'lucide-react'
 
 const keyMap = {
   Backquote: '`',
@@ -175,6 +176,11 @@ const ShortcutInput: React.FC<{
     event.preventDefault()
     let code = event.code
     const key = event.key
+    if (code === 'Escape') {
+      setInputValue(value)
+      setIsFocused(false)
+      return
+    }
     if (code === 'Backspace') {
       setKey('')
     } else {
@@ -222,7 +228,7 @@ const ShortcutInput: React.FC<{
       {inputValue !== value && (
         <Button
           size="sm"
-          className="h-8 px-2.5 text-xs font-medium shrink-0"
+          className="h-8 px-2.5 text-xs font-medium shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
           onClick={async () => {
             try {
               if (await registerShortcut(value, inputValue, action)) {
@@ -239,32 +245,54 @@ const ShortcutInput: React.FC<{
           {t('settings.shortcuts.confirm')}
         </Button>
       )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className={`w-64 h-8 justify-start gap-1 font-normal shrink-0 overflow-hidden text-left ${isFocused ? 'ring-2 ring-ring/50 ring-offset-2 ring-offset-background' : ''}`}
-        onKeyDown={(e: KeyboardEvent<HTMLButtonElement>): void => {
-          parseShortcut(e, setInputValue)
-        }}
-        onFocus={() => {
-          setIsFocused(true)
-          setActiveAction(action)
-        }}
-        onBlur={() => setIsFocused(false)}
-      >
-        {displayKeys.length > 0 ? (
-          <KbdGroup>
-            {displayKeys.map((key, index) => (
-              <Kbd key={`${key}-${index}`}>{key}</Kbd>
-            ))}
-          </KbdGroup>
-        ) : (
-          <span className="text-muted-foreground text-xs truncate">
-            {t('settings.shortcuts.clickToInput')}
-          </span>
+      <div className="relative group shrink-0">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title={inputValue || t('settings.shortcuts.clickToInput')}
+          className={`w-64 sm:w-72 h-8 justify-start px-3 pr-7 gap-1 font-normal overflow-hidden text-left ${
+            isFocused ? 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background border-primary' : ''
+          }`}
+          onKeyDown={(e: KeyboardEvent<HTMLButtonElement>): void => {
+            parseShortcut(e, setInputValue)
+          }}
+          onFocus={() => {
+            setIsFocused(true)
+            setActiveAction(action)
+          }}
+          onBlur={() => setIsFocused(false)}
+        >
+          {displayKeys.length > 0 ? (
+            <KbdGroup>
+              {displayKeys.map((key, index) => (
+                <Kbd key={`${key}-${index}`}>{key}</Kbd>
+              ))}
+            </KbdGroup>
+          ) : isFocused ? (
+            <span className="text-primary text-xs font-medium animate-pulse">
+              {t('settings.shortcuts.recording', 'Нажмите комбинацию...')}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-xs whitespace-nowrap">
+              {t('settings.shortcuts.clickToInput')}
+            </span>
+          )}
+        </Button>
+        {inputValue && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 size-4 flex items-center justify-center text-muted-foreground hover:text-white transition-opacity opacity-0 group-hover:opacity-100 cursor-pointer"
+            title={t('common.clear', 'Очистить')}
+            onClick={(e) => {
+              e.stopPropagation()
+              setInputValue('')
+            }}
+          >
+            <X className="size-3.5" />
+          </button>
         )}
-      </Button>
+      </div>
     </div>
   )
 }

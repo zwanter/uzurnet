@@ -568,7 +568,8 @@ export default {
       restartApp: 'Restart App',
       registerFailed: 'Shortcut registration failed',
       registerFailedWithError: 'Shortcut registration failed: ',
-      clickToInput: 'Click to input shortcut',
+      clickToInput: 'Click to record',
+      recording: 'Press hotkey...',
       confirm: 'Confirm'
     },
     actions: {

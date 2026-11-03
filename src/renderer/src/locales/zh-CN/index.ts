@@ -607,7 +607,8 @@ export default {
       restartApp: '重启应用',
       registerFailed: '快捷键注册失败',
       registerFailedWithError: '快捷键注册失败：',
-      clickToInput: '点击输入快捷键',
+      clickToInput: '点击录制快捷键',
+      recording: '请按下快捷键...',
       confirm: '确认'
     },
     actions: {

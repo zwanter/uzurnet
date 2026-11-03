@@ -35,17 +35,19 @@ const Settings: React.FC = () => {
         </>
       }
     >
-      <ProxySwitches />
-      <AutoSelectConfig />
-      <GeneralConfig showHiddenSettings={showHiddenSettings} />
-      <LanguageConfig />
-      <AppearanceConfig showHiddenSettings={showHiddenSettings} />
-      <AdvancedSettings showHiddenSettings={showHiddenSettings} />
-      <ShortcutConfig />
-      <Actions
-        showHiddenSettings={showHiddenSettings}
-        onUnlockHiddenSettings={() => setShowHiddenSettings(true)}
-      />
+      <div className="w-full max-w-5xl mx-auto flex flex-col pb-8">
+        <ProxySwitches />
+        <AutoSelectConfig />
+        <GeneralConfig showHiddenSettings={showHiddenSettings} />
+        <LanguageConfig />
+        <AppearanceConfig showHiddenSettings={showHiddenSettings} />
+        <AdvancedSettings showHiddenSettings={showHiddenSettings} />
+        <ShortcutConfig />
+        <Actions
+          showHiddenSettings={showHiddenSettings}
+          onUnlockHiddenSettings={() => setShowHiddenSettings(true)}
+        />
+      </div>
     </BasePage>
   )
 }

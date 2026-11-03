@@ -569,7 +569,8 @@ export default {
       restartApp: 'Перезапустить приложение',
       registerFailed: 'Не удалось зарегистрировать горячую клавишу',
       registerFailedWithError: 'Не удалось зарегистрировать горячую клавишу: ',
-      clickToInput: 'Нажмите для ввода горячей клавиши',
+      clickToInput: 'Нажмите для ввода',
+      recording: 'Нажмите комбинацию...',
       confirm: 'Подтвердить'
     },
     actions: {
