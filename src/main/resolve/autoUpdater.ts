@@ -43,10 +43,10 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
   const releaseTag = version
   const baseUrl = `https://github.com/zwanter/koala-clash/releases/download/${releaseTag}/`
   const fileMap = {
-    'win32-x64': `Koala.Clash_x64-setup.exe`,
-    'win32-arm64': `Koala.Clash_arm64-setup.exe`,
-    'darwin-x64': `Koala.Clash_x64.pkg`,
-    'darwin-arm64': `Koala.Clash_arm64.pkg`
+    'win32-x64': `UzurNet_x64-setup.exe`,
+    'win32-arm64': `UzurNet_arm64-setup.exe`,
+    'darwin-x64': `UzurNet_x64.pkg`,
+    'darwin-arm64': `UzurNet_arm64.pkg`
   }
   let file = fileMap[`${process.platform}-${process.arch}`]
   if (isPortable()) {
@@ -79,7 +79,16 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
 
     const releaseRes = await axios.get(apiUrl, apiRequestConfig)
     const assets: Array<{ name: string; digest?: string }> = releaseRes.data.assets || []
-    const matchedAsset = assets.find((a) => a.name === file)
+    let matchedAsset = assets.find((a) => a.name === file)
+    if (!matchedAsset) {
+      // Backward-compatibility: fallback to legacy Koala.Clash naming
+      const legacyFile = file.replace('UzurNet', 'Koala.Clash')
+      const legacyAsset = assets.find((a) => a.name === legacyFile)
+      if (legacyAsset) {
+        file = legacyFile
+        matchedAsset = legacyAsset
+      }
+    }
     if (!matchedAsset || !matchedAsset.digest) {
       throw new Error(`${t('error.sha256NotFound')}: "${file}"`)
     }

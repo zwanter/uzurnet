@@ -38,12 +38,15 @@ import { startSSIDCheck } from '../sys/ssid'
 import { startNetworkDetection } from '../core/manager'
 import { PORT_KEYS } from '../core/factory'
 import { initKeyManager } from '../service/manager'
-import { migrateFromOldApp } from './migration'
+import { migrateFromOldApp, migrateLegacyKoalaElectronData } from './migration'
 import { cleanupLogs } from './logs'
 
 async function initDirs(): Promise<void> {
+  // Migrate existing data from legacy Koala Clash folder before directory initialization
+  migrateLegacyKoalaElectronData()
+
   if (!existsSync(dataDir())) {
-    await mkdir(dataDir())
+    await mkdir(dataDir(), { recursive: true })
   }
   const dirs = [
     themesDir(),

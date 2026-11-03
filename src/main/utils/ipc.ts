@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import { runAutoSelect, restartAutoSelectTimer } from '../resolve/autoSelector'
+import { runAutoSelect, restartAutoSelectTimer, getServerMetrics } from '../resolve/autoSelector'
 import {
   mihomoChangeProxy,
   mihomoCloseAllConnections,
@@ -189,6 +189,7 @@ export function registerIpcMainHandlers(): void {
     return res
   })
   ipcMain.handle('runAutoSelectProxy', () => ipcErrorWrapper(runAutoSelect)(true))
+  ipcMain.handle('getServerMetrics', () => ipcErrorWrapper(getServerMetrics)())
   ipcMain.handle('getControledMihomoConfig', (_e, force) =>
     ipcErrorWrapper(getControledMihomoConfig)(force)
   )

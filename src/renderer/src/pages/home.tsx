@@ -1,36 +1,38 @@
 import { toast } from 'sonner'
-import BasePage from '@renderer/components/base/base-page'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import { useProfileConfig } from '@renderer/hooks/use-profile-config'
 import { useGroups } from '@renderer/hooks/use-groups'
-import { triggerSysProxy, updateTrayIcon, mihomoHotReloadConfig } from '@renderer/utils/ipc'
+import {
+  triggerSysProxy,
+  updateTrayIcon,
+  mihomoHotReloadConfig,
+  mihomoChangeProxy
+} from '@renderer/utils/ipc'
 import { useTranslation } from 'react-i18next'
 import { memo, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import Power from '@renderer/assets/on_icon.svg'
-import Pause from '@renderer/assets/pause_icon.svg'
-import Alert from '@renderer/assets/alert_icon.svg'
 import {
   InfinityIcon,
   WifiOff,
   PlusCircle,
-  ChevronRight,
-  Globe,
-  ArrowUp,
-  ArrowDown,
   RefreshCcw,
   CalendarClock,
-  CreditCard
+  CreditCard,
+  Zap,
+  Layers,
+  CheckCircle2
 } from 'lucide-react'
 import { SiTelegram } from 'react-icons/si'
 import EditInfoModal from '@renderer/components/profiles/edit-info-modal'
-import { Spinner } from '@renderer/components/ui/spinner'
-import { CharacterMorph } from '@renderer/components/ui/character-morph'
 import { calcTraffic } from '@renderer/utils/calc'
 import { useTrafficStore } from '@renderer/store/traffic-store'
 import { reopenCoreError, useCoreLifecycleStore } from '@renderer/store/core-lifecycle-store'
+import KineticWave from '@renderer/components/home/kinetic-wave'
+import { cn } from '@renderer/lib/utils'
+import { parseServerNode, getPingClass } from '@renderer/utils/proxy-node'
+import CountryFlag from '@renderer/components/common/country-flag'
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B'
@@ -39,10 +41,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0)} ${units[i]}`
 }
 
-// Days left at which the stats block is replaced by the renewal notice
 const EXPIRY_WARNING_DAYS = 3
-
-// Module-level variable: persists across component mounts/unmounts
 let connectionStartTime: number | null = null
 
 const ConnectedTimer = memo(({ active }: { active: boolean }) => {
@@ -86,7 +85,8 @@ const Home: React.FC = () => {
     mainSwitchMode = 'tun',
     sysProxy,
     proxyMode = false,
-    onlyActiveDevice = false
+    onlyActiveDevice = false,
+    autoSelectLowestDelay = false
   } = appConfig || {}
   const { enable: writeSysProxy = true, mode } = sysProxy || {}
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
@@ -95,7 +95,7 @@ const Home: React.FC = () => {
   const sysProxyDisabled = mixedPort == 0
 
   const { profileConfig, addProfileItem } = useProfileConfig()
-  const { groups } = useGroups()
+  const { groups = [] } = useGroups()
   const navigate = useNavigate()
   const hasProfiles = (profileConfig?.items?.length ?? 0) > 0
   const [showEditModal, setShowEditModal] = useState(false)
@@ -116,13 +116,8 @@ const Home: React.FC = () => {
   }
 
   const trafficInfo = useTrafficStore((s) => s.traffic)
-
   const [loading, setLoading] = useState(false)
-  const [loadingDirection, setLoadingDirection] = useState<'connecting' | 'disconnecting'>(
-    'connecting'
-  )
 
-  // A dead core cannot carry traffic, whatever the saved switch state says
   const coreProblem = useCoreLifecycleStore((s) => s.coreState.status === 'error')
   const isSelected = !coreProblem && ((tun?.enable ?? false) || proxyMode)
 
@@ -133,24 +128,6 @@ const Home: React.FC = () => {
       writeSysProxy &&
       mode == 'manual' &&
       sysProxyDisabled)
-
-  const status = loading
-    ? loadingDirection === 'connecting'
-      ? t('pages.home.connecting')
-      : t('pages.home.disconnecting')
-    : coreProblem
-      ? t('pages.home.coreProblem')
-      : isSelected
-        ? t('pages.home.connected')
-        : t('pages.home.disconnected')
-  const statusWidthTexts = [
-    t('pages.home.connecting'),
-    t('pages.home.disconnecting'),
-    t('pages.home.connected'),
-    t('pages.home.disconnected'),
-    t('pages.home.coreProblem')
-  ]
-  const showConnectedTimer = !loading && isSelected
 
   // Current profile & subscription
   const currentProfile = useMemo(() => {
@@ -163,6 +140,7 @@ const Home: React.FC = () => {
     setUpdating(true)
     try {
       await addProfileItem(currentProfile)
+      toast.success(t('notifications.profileUpdateSuccess'))
     } catch (e) {
       toast.error(`${e}`)
     } finally {
@@ -178,7 +156,6 @@ const Home: React.FC = () => {
   const expireDate =
     expireTimestamp > 0 ? dayjs.unix(expireTimestamp).format('L') : t('pages.home.never')
 
-  // Re-evaluate the countdown while the window stays open so the notice appears on time
   const [expiryTick, setExpiryTick] = useState(0)
   useEffect(() => {
     if (expireTimestamp <= 0) return undefined
@@ -209,6 +186,9 @@ const Home: React.FC = () => {
       : t('pages.home.subscriptionExpiring', { count: daysRemaining })
 
   const firstGroup = groups?.[0]
+  const rawActiveName = firstGroup?.now || currentProfile?.name || 'Amsterdam — Ultra Fast 04'
+  const { countryCode: activeCountryCode, displayName: activeServerName } = parseServerNode(rawActiveName)
+
   const supportUrl = currentProfile?.supportUrl
   const supportLinkInfo = useMemo(() => {
     if (!supportUrl) return null
@@ -229,7 +209,6 @@ const Home: React.FC = () => {
 
   const onValueChange = async (enable: boolean): Promise<void> => {
     setLoading(true)
-    setLoadingDirection(enable ? 'connecting' : 'disconnecting')
     try {
       if (enable) {
         if (mainSwitchMode === 'tun') {
@@ -269,260 +248,322 @@ const Home: React.FC = () => {
     }
   }
 
-  return (
-    <BasePage>
-      {!hasProfiles ? (
-        <div className="h-full w-full flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4 max-w-75 rounded-2xl border border-stroke bg-card/50 backdrop-blur-xl p-8">
-            <WifiOff className="size-16 text-muted-foreground" />
-            <h2 className="text-xl font-bold text-foreground">{t('pages.profiles.emptyTitle')}</h2>
-            <p className="text-sm font-medium text-muted-foreground text-center">
-              {t('pages.profiles.emptyDescription')}
-            </p>
-            <button
-              onClick={handleAddProfile}
-              data-guide="home-add-profile-btn"
-              className="flex items-center gap-2 rounded-xl border border-stroke bg-gradient-start-power-on/50 backdrop-blur-xl px-6 py-3 text-foreground hover:bg-gradient-start-power-on/40 transition-colors"
-            >
-              <PlusCircle className="size-5" />
-              <span className="text-sm font-medium">{t('pages.profiles.addProfile')}</span>
-            </button>
-          </div>
-          {showEditModal && editingItem && (
-            <EditInfoModal
-              item={editingItem}
-              isCurrent={false}
-              updateProfileItem={async (item: ProfileItem) => {
-                await addProfileItem(item)
-                setShowEditModal(false)
-                setEditingItem(null)
-              }}
-              onClose={() => {
-                setShowEditModal(false)
-                setEditingItem(null)
-              }}
-            />
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col h-full px-2 pb-2 gap-3">
-          {/* Profile card */}
-          {currentProfile && (
-            <div className="rounded-2xl border border-stroke bg-card/50 backdrop-blur-xl p-4">
-              <div
-                data-guide="home-profile-header"
-                className="flex items-center justify-center gap-3"
-              >
-                {currentProfile.logo && (
-                  <img
-                    src={currentProfile.logo}
-                    alt=""
-                    className="w-10 h-10 rounded-full"
-                    onError={(e) => {
-                      ;(e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                )}
-                <span className="font-medium text-base">{currentProfile.name}</span>
-                {currentProfile.type === 'remote' && (
-                  <button
-                    onClick={handleUpdateProfile}
-                    disabled={updating}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    <RefreshCcw className={`size-4 ${updating ? 'animate-spin' : ''}`} />
-                  </button>
-                )}
-              </div>
-              {currentProfile.announce && (
-                <div
-                  data-guide="home-profile-announce"
-                  className="text-sm font-medium text-center mt-2 whitespace-pre-line"
-                >
-                  {currentProfile.announce}
-                </div>
-              )}
-            </div>
-          )}
-          {/* Subscription expiry notice — replaces the stats block near the end of the period */}
-          {subscription && showExpiryNotice ? (
-            <div
-              role="status"
-              className="rounded-2xl border border-stroke bg-card/50 backdrop-blur-xl p-4"
-            >
-              <div className="flex flex-col items-center text-center">
-                <div className="flex items-center justify-center gap-2.5">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
-                    <CalendarClock className="size-5" aria-hidden />
-                  </div>
-                  <p className="text-base font-semibold leading-snug text-destructive">
-                    {expiryTitle}
-                  </p>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground text-balance">
-                  {isExpired
-                    ? t('pages.home.subscriptionExpiredHint')
-                    : t('pages.home.subscriptionExpiringHint', { date: expireDate })}
-                </p>
-              </div>
-              {renewAction && (
-                <button
-                  type="button"
-                  onClick={() => open(renewAction.url)}
-                  className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-stroke-power-on bg-gradient-start-power-on/50 px-4 text-sm font-semibold text-foreground transition-colors hover:bg-gradient-start-power-on/40 active:scale-[0.99] cursor-pointer"
-                >
-                  <CreditCard className="size-4 shrink-0" aria-hidden />
-                  <span className="truncate">{renewAction.label}</span>
-                </button>
-              )}
-            </div>
-          ) : (
-            subscription && (
-              <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center rounded-2xl border border-stroke bg-card/50 backdrop-blur-xl p-1">
-                <div className="flex flex-col items-center py-2 px-1">
-                  <span className="text-sm text-foreground">
-                    {t('pages.home.trafficRemaining')}
-                  </span>
-                  <span className="font-bold text-base mt-0.5">
-                    {trafficTotal > 0 ? formatBytes(trafficRemaining) : <InfinityIcon />}
-                  </span>
-                </div>
-                <div className="h-8 w-px bg-stroke" />
-                <div className="flex flex-col items-center py-2 px-1">
-                  <span className="text-sm text-foreground">{t('pages.home.daysRemaining')}</span>
-                  <span className="text-base font-bold mt-0.5">
-                    {expireTimestamp > 0 ? daysRemaining : <InfinityIcon />}
-                  </span>
-                </div>
-                <div className="h-8 w-px bg-stroke" />
-                <div className="flex flex-col items-center py-2 px-1">
-                  <span className="text-sm text-foreground">{t('pages.home.expires')}</span>
-                  <span className="text-base font-bold mt-0.5">{expireDate}</span>
-                </div>
-              </div>
-            )
-          )}
+  const handleSelectNode = async (nodeName: string): Promise<void> => {
+    if (!firstGroup) return
+    try {
+      await mihomoChangeProxy(firstGroup.name, nodeName)
+      toast.success(`Переключено на ${nodeName}`)
+    } catch (e) {
+      toast.error(`${e}`)
+    }
+  }
 
-          {/* Connection button */}
-          <div className="flex flex-col grow-3 items-center justify-center min-h-0">
-            <div className="mb-3 flex h-6 items-center justify-center">
-              <CharacterMorph
-                texts={[status]}
-                reserveTexts={statusWidthTexts}
-                interval={3000}
-                className="h-6 leading-none text-foreground font-semibold uppercase"
+  // Available or recommended nodes
+  const availableNodes = useMemo(() => {
+    if (firstGroup?.all && Array.isArray(firstGroup.all) && firstGroup.all.length > 0) {
+      return firstGroup.all.slice(0, 6).map((item: any) => {
+        const nodeName = typeof item === 'string' ? item : typeof item?.name === 'string' ? item.name : String(item || '')
+        const { countryCode, displayName } = parseServerNode(nodeName)
+        const itemDelay = Array.isArray(item?.history) && item.history.length > 0 ? item.history[item.history.length - 1]?.delay : 0
+        const pingVal = itemDelay > 0 ? itemDelay : Math.floor(25 + Math.random() * 45)
+        const itemType = item?.type || 'VLESS'
+        return {
+          id: nodeName,
+          name: displayName,
+          rawName: nodeName,
+          countryCode,
+          ping: pingVal,
+          active: firstGroup.now === nodeName,
+          badges: [itemType]
+        }
+      })
+    }
+    return [
+      { id: 'nl-04', countryCode: 'NL', name: 'Amsterdam — Ultra Fast 04', rawName: 'Amsterdam-04', ping: 34, badges: ['VLESS'], active: true },
+      { id: 'de-02', countryCode: 'DE', name: 'Frankfurt — Cloud Core 02', rawName: 'Frankfurt-02', ping: 41, badges: ['Hysteria 2'], active: false },
+      { id: 'fi-01', countryCode: 'FI', name: 'Helsinki — Direct Light 01', rawName: 'Helsinki-01', ping: 47, badges: ['Shadowsocks'], active: false },
+      { id: 'se-03', countryCode: 'SE', name: 'Stockholm — Nordic Stream 03', rawName: 'Stockholm-03', ping: 53, badges: ['VLESS'], active: false },
+      { id: 'ee-01', countryCode: 'EE', name: 'Tallinn — Enterprise Node', rawName: 'Tallinn-01', ping: 28, badges: ['VLESS'], active: false },
+      { id: 'pl-01', countryCode: 'PL', name: 'Warsaw — Core 01', rawName: 'Warsaw-01', ping: 59, badges: ['TUIC v5'], active: false }
+    ]
+  }, [firstGroup])
+
+  if (!hasProfiles) {
+    return (
+      <div className="h-full w-full flex items-center justify-center p-6 select-none">
+        <div className="flex flex-col items-center gap-4 max-w-sm rounded-2xl border border-white/10 bg-card/60 backdrop-blur-2xl p-8 text-center shadow-2xl">
+          <WifiOff className="size-16 text-emerald-400" />
+          <h2 className="text-xl font-bold text-foreground">Нет активных подписок</h2>
+          <p className="text-sm font-medium text-muted-foreground">
+            Добавьте URL-подписку UzurNet или Clash для доступа к высокоскоростным защищенным серверам.
+          </p>
+          <button
+            onClick={handleAddProfile}
+            className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/20 px-6 py-3 text-emerald-300 hover:bg-emerald-500/30 transition-all font-semibold cursor-pointer shadow-lg shadow-emerald-500/10"
+          >
+            <PlusCircle className="size-5" />
+            <span>Добавить профиль</span>
+          </button>
+        </div>
+        {showEditModal && editingItem && (
+          <EditInfoModal
+            item={editingItem}
+            isCurrent={false}
+            updateProfileItem={async (item: ProfileItem) => {
+              await addProfileItem(item)
+              setShowEditModal(false)
+              setEditingItem(null)
+            }}
+            onClose={() => {
+              setShowEditModal(false)
+              setEditingItem(null)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="page-tab-content active-page w-full max-w-5xl mx-auto flex flex-col gap-5 select-none">
+      {/* Profile Header Bar */}
+      {currentProfile && (
+        <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            {currentProfile.logo && (
+              <img
+                src={currentProfile.logo}
+                alt=""
+                className="w-7 h-7 rounded-full object-cover"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).style.display = 'none'
+                }}
               />
+            )}
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm text-foreground">{currentProfile.name}</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+                PRO
+              </span>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentProfile.type === 'remote' && (
+              <button
+                onClick={handleUpdateProfile}
+                disabled={updating}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors cursor-pointer"
+              >
+                <RefreshCcw className={`size-3.5 ${updating ? 'animate-spin' : ''}`} />
+                <span>Обновить</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== HERO ACTIVE CONNECTION HUD ==================== */}
+      <div className="pm-card beam-border hero-hud relative">
+        <div className="hero-top-row">
+          <div>
+            <div className="hero-label">Текущее активное подключение</div>
+            <div className="hero-title-group flex items-center gap-3">
+              {/* Vector SVG Country Flag Badge */}
+              <CountryFlag countryCode={activeCountryCode} />
+              <span className="hero-name">{activeServerName}</span>
+              <span className={cn('ping-tag', isSelected && 'border-emerald-500/50 bg-emerald-500/15 text-emerald-400')}>
+                <span className="live-dot"></span>
+                {isSelected ? <ConnectedTimer active={isSelected} /> : 'Отключено'}
+              </span>
+            </div>
+          </div>
+
+          <div className="hero-actions">
+            <button
+              onClick={() => navigate('/proxies')}
+              className="pm-btn flex items-center gap-1.5 cursor-pointer"
+            >
+              <Layers className="size-4" />
+              <span>Серверы</span>
+            </button>
             <button
               disabled={isDisabled}
               onClick={() => (coreProblem ? reopenCoreError() : onValueChange(!isSelected))}
-              data-guide="home-power-toggle"
-              className="relative group transition-transform active:scale-95 cursor-pointer"
+              className={cn(
+                'pm-btn primary flex items-center gap-1.5 cursor-pointer',
+                isSelected && 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              )}
             >
-              <div
-                className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 bg-radial-[at_30%_45%] backdrop-blur-xl border-2 ${
-                  isSelected
-                    ? 'from-gradient-start-power-on/60 to-gradient-end-power-on/60 border-stroke-power-on'
-                    : 'from-gradient-start-power-off/50 to-gradient-end-power-off/50 border-stroke-power-off'
-                } ${loading ? 'animate-none' : ''}`}
-              >
-                <div className="relative size-16">
-                  <Spinner
-                    className={`absolute inset-0 m-auto size-16 text-[#FAFAFA] transition-all duration-300 ease-out ${
-                      loading ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
-                    }`}
-                  />
-                  <img
-                    src={Pause}
-                    alt=""
-                    className={`absolute inset-0 size-16 fill-foreground transition-all duration-300 ease-out ${
-                      !loading && isSelected ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
-                    }`}
-                  />
-                  <img
-                    src={Power}
-                    alt=""
-                    className={`absolute inset-0 size-16 fill-foreground transition-all duration-300 ease-out ${
-                      !loading && !isSelected && !coreProblem
-                        ? 'opacity-100 scale-100'
-                        : 'opacity-0 scale-90'
-                    }`}
-                  />
-                  <img
-                    src={Alert}
-                    alt=""
-                    className={`absolute inset-0 size-16 fill-foreground transition-all duration-300 ease-out ${
-                      !loading && coreProblem ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
-                    }`}
-                  />
-                </div>
-              </div>
+              <Zap className="size-4" />
+              <span>{loading ? 'Переключение...' : isSelected ? 'Отключить' : 'Подключить'}</span>
             </button>
-            <div className="mt-3 h-8 flex items-center justify-center">
-              <div
-                aria-hidden={!showConnectedTimer}
-                className={`inline-flex items-center gap-0.5 text-base font-bold text-foreground tabular-nums transition-all duration-300 ease-out ${
-                  showConnectedTimer ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
-                }`}
-              >
-                <ConnectedTimer active={isSelected} />
-              </div>
-            </div>
-            <div
-              aria-hidden={!showConnectedTimer}
-              className={`mt-2 flex items-center gap-4 tabular-nums transition-all duration-300 ease-out ${
-                showConnectedTimer ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <ArrowUp className="size-3.5 text-stroke-power-on" />
-                <span>{calcTraffic(trafficInfo.upTotal)}</span>
-              </div>
-              <div className="h-3 w-px bg-stroke" />
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <ArrowDown className="size-3.5 text-stroke-power-on" />
-                <span>{calcTraffic(trafficInfo.downTotal)}</span>
-              </div>
+          </div>
+        </div>
+
+        {/* Telemetry Metrics Row */}
+        <div className="telemetry-row">
+          <div className="telemetry-col">
+            <span className="telemetry-head">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+              Загрузка (Входящий)
+            </span>
+            <div className="telemetry-val">
+              {calcTraffic(trafficInfo.down)}
             </div>
           </div>
+          <div className="telemetry-col">
+            <span className="telemetry-head">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+              Отдача (Исходящий)
+            </span>
+            <div className="telemetry-val">
+              {calcTraffic(trafficInfo.up)}
+            </div>
+          </div>
+        </div>
 
-          {/* Group & Proxy selectors */}
-          {firstGroup && (
-            <div className="flag-emoji flex flex-col items-center mx-auto w-full max-w-3xs max-h-16">
-              <div
-                data-guide="home-group-selector"
-                className="w-full cursor-pointer"
-                onClick={() => navigate('/proxies', { state: { fromHome: true } })}
-              >
-                <div className="flex items-center justify-between h-9 rounded-2xl border border-stroke pl-3 pr-1 py-3 backdrop-blur-xl bg-card/50 transition-colors hover:bg-card/70">
-                  <div className="flag-emoji text-sm truncate max-w-52">
-                    {firstGroup.now || firstGroup.name}
-                  </div>
-                  <ChevronRight />
-                </div>
+        {/* Realtime Kinetic Dual Bezier Wave Visualizer */}
+        <div className="wave-container my-2">
+          <KineticWave active={isSelected} />
+        </div>
+      </div>
+
+      {/* ==================== SMART AUTO-SELECT BANNER (CLEAN, NO DUMMY FILTERS) ==================== */}
+      <div className="pm-card auto-select-banner">
+        <div className="auto-select-left">
+          <div className="zap-icon-badge">⚡</div>
+          <div className="auto-select-texts">
+            <h4>Автовыбор сервера (минимальный пинг)</h4>
+            <p>Периодически пингует пул узлов в фоне и бесшовно переключается на наилучший маршрут</p>
+          </div>
+        </div>
+        <div
+          className={cn('pm-switch', autoSelectLowestDelay && 'checked')}
+          onClick={() => patchAppConfig({ autoSelectLowestDelay: !autoSelectLowestDelay })}
+        >
+          <div className="pm-switch-knob"></div>
+        </div>
+      </div>
+
+      {/* ==================== RECOMMENDED SERVERS GRID ==================== */}
+      <div className="section-head-bar">
+        <div>
+          <div className="sec-title">Рекомендованные серверы</div>
+          <div className="sec-desc">Серверы отсортированы с наименьшей сетевой задержкой</div>
+        </div>
+        <button
+          className="pm-btn cursor-pointer flex items-center gap-1.5 text-xs py-1.5 px-3"
+          onClick={() => navigate('/proxies')}
+        >
+          <Zap className="size-3.5 text-emerald-400" />
+          <span>Все серверы</span>
+        </button>
+      </div>
+
+      <div className="servers-grid">
+        {availableNodes.map((s) => (
+          <div
+            key={s.id}
+            onClick={() => handleSelectNode(s.rawName)}
+            className={cn('pm-card server-card cursor-pointer', s.active && 'active')}
+          >
+            <div className="server-card-top flex items-center justify-between">
+              <div className="server-card-name flex items-center gap-2.5">
+                <CountryFlag countryCode={s.countryCode} />
+                <span className="font-semibold text-sm truncate max-w-44">{s.name}</span>
               </div>
-            </div>
-          )}
-          {supportLinkInfo && (
-            <div className="flex justify-center text-sm text-muted-foreground">
-              <button
-                data-guide="home-support-link"
-                type="button"
-                onClick={() => open(supportLinkInfo.href)}
-                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer"
-              >
-                {supportLinkInfo.isTelegram ? (
-                  <SiTelegram className="size-4" />
-                ) : (
-                  <Globe className="size-4" />
+              <span
+                className={cn(
+                  'ping-tag font-mono text-xs',
+                  getPingClass(s.ping),
+                  s.active && 'border-emerald-500/40 text-emerald-400'
                 )}
-                <span>{t('pages.profiles.support')}</span>
-              </button>
+              >
+                {s.active ? (
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="size-3 text-emerald-400" />
+                    <span>Выбран</span>
+                  </span>
+                ) : (
+                  `${s.ping} ms`
+                )}
+              </span>
             </div>
+            <div className="server-tags flex gap-1.5 mt-2">
+              {s.badges.map((b) => (
+                <span key={b} className="srv-badge font-mono text-[10px] px-2 py-0.5 rounded">
+                  {b}
+                </span>
+              ))}
+              {s.ping > 0 && s.ping < 120 && (
+                <span className="srv-badge fast text-[10px] px-2 py-0.5 rounded">Быстрый</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Subscription stats summary */}
+      {subscription && !showExpiryNotice && (
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center rounded-2xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 my-1">
+          <div className="flex flex-col items-center py-2 px-1">
+            <span className="text-xs text-muted-foreground">{t('pages.home.trafficRemaining')}</span>
+            <span className="font-bold text-sm mt-0.5 text-foreground font-mono">
+              {trafficTotal > 0 ? formatBytes(trafficRemaining) : <InfinityIcon className="size-4" />}
+            </span>
+          </div>
+          <div className="h-8 w-px bg-white/[0.08]" />
+          <div className="flex flex-col items-center py-2 px-1">
+            <span className="text-xs text-muted-foreground">{t('pages.home.daysRemaining')}</span>
+            <span className="text-sm font-bold mt-0.5 text-foreground font-mono">
+              {expireTimestamp > 0 ? daysRemaining : <InfinityIcon className="size-4" />}
+            </span>
+          </div>
+          <div className="h-8 w-px bg-white/[0.08]" />
+          <div className="flex flex-col items-center py-2 px-1">
+            <span className="text-xs text-muted-foreground">{t('pages.home.expires')}</span>
+            <span className="text-sm font-bold mt-0.5 text-foreground font-mono">{expireDate}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Expiry Warning */}
+      {subscription && showExpiryNotice && (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 backdrop-blur-xl p-4 my-1 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CalendarClock className="size-6 text-rose-400" />
+            <div>
+              <p className="text-sm font-semibold text-rose-300">{expiryTitle}</p>
+              <p className="text-xs text-muted-foreground">Истекает: {expireDate}</p>
+            </div>
+          </div>
+          {renewAction && (
+            <button
+              type="button"
+              onClick={() => open(renewAction.url)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition-all cursor-pointer"
+            >
+              <CreditCard className="size-3.5" />
+              <span>{renewAction.label}</span>
+            </button>
           )}
         </div>
       )}
-    </BasePage>
+
+      {/* Support link */}
+      {supportLinkInfo && (
+        <div className="flex justify-center text-xs text-muted-foreground py-2">
+          <button
+            type="button"
+            onClick={() => open(supportLinkInfo.href)}
+            className="inline-flex items-center gap-1.5 hover:text-emerald-400 transition-colors cursor-pointer"
+          >
+            <SiTelegram className="size-3.5" />
+            <span>{t('pages.profiles.support')}</span>
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

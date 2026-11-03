@@ -10,6 +10,8 @@ import {
   applyTheme,
   checkUpdate,
   declineElevation,
+  getAppConfig,
+  getVersion,
   needsFirstRunAdmin,
   restartAsAdmin,
   setNativeTheme
@@ -17,12 +19,12 @@ import {
 import { platform } from '@renderer/utils/init'
 import useSWR from 'swr'
 import ConfirmModal from '@renderer/components/base/base-confirm'
-import { SidebarProvider } from '@renderer/components/ui/sidebar'
 import AppSidebar from '@renderer/components/app-sidebar'
 import UpdateBanner from '@renderer/components/updater/update-banner'
 import HwidLimitAlert from '@renderer/components/profiles/hwid-limit-alert'
 import CoreErrorAlert from '@renderer/components/mihomo/core-error-alert'
 import WindowControls from '@renderer/components/window-controls'
+import UzurNetLogo from '@renderer/components/common/uzurnet-logo'
 import { attachConnectionsStore } from '@renderer/store/connections-store'
 import { attachTrafficStore } from '@renderer/store/traffic-store'
 import { attachLogsStore } from '@renderer/store/logs-store'
@@ -49,6 +51,11 @@ const App: React.FC = () => {
       refreshInterval: 1000 * 60 * 10
     }
   )
+
+  const [appVer, setAppVer] = useState('')
+  useEffect(() => {
+    getVersion().then((v) => setAppVer(v)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const detachConnections = attachConnectionsStore()
@@ -123,27 +130,33 @@ const App: React.FC = () => {
     }
     window.electron.ipcRenderer.on('needs-admin-setup', handleNeedsAdminSetup)
 
-    const handleAutoSelectCompleted = (
+    const handleAutoSelectCompleted = async (
       _event: unknown,
       data: {
         manual: boolean
+        notify?: boolean
         results: { group: string; switched: boolean; current: string; delay: number }[]
       }
-    ): void => {
-      if (data && data.results && !data.manual) {
-        const switched = data.results.filter((r) => r.switched)
-        if (switched.length > 0 && appConfig?.autoSelectNotify !== false) {
-          switched.forEach((r) => {
-            toast.success(
-              t('autoSelect.switchedToast', {
-                group: r.group,
-                proxy: r.current,
-                delay: r.delay,
-                defaultValue: `Автовыбор [${r.group}]: переключено на ${r.current} (${r.delay} мс)`
-              })
-            )
-          })
-        }
+    ): Promise<void> => {
+      if (!data || !data.results || data.manual) return
+      if (data.notify === false) return
+
+      // Double check latest config to prevent stale closure notifications
+      const latestCfg = await getAppConfig().catch(() => null)
+      if (latestCfg && latestCfg.autoSelectNotify === false) return
+
+      const switched = data.results.filter((r) => r.switched)
+      if (switched.length > 0) {
+        switched.forEach((r) => {
+          toast.success(
+            t('autoSelect.switchedToast', {
+              group: r.group,
+              proxy: r.current,
+              delay: r.delay,
+              defaultValue: `Автовыбор [${r.group}]: переключено на ${r.current} (${r.delay} мс)`
+            })
+          )
+        })
       }
     }
     window.electron.ipcRenderer.on('autoSelectCompleted', handleAutoSelectCompleted)
@@ -174,17 +187,21 @@ const App: React.FC = () => {
   }
 
   return (
-    <SidebarProvider
-      defaultOpen={false}
-      className="relative w-full h-screen overflow-hidden"
+    <div
+      className="app-window w-screen h-screen flex flex-col overflow-hidden select-none"
       style={{
         background:
           resolvedTheme === 'dark'
-            ? 'radial-gradient(100% 70% at 50% 0%, rgba(255, 255, 255, 0.035) 0%, transparent 100%), #202020'
-            : 'radial-gradient(100% 70% at 50% 0%, #ffffff 0%, transparent 100%), #f3f3f3'
+            ? 'radial-gradient(140% 120% at 50% -10%, #0c101c 0%, #05070b 60%, #020305 100%)'
+            : 'radial-gradient(140% 120% at 50% -10%, #eef2f9 0%, #e2e8f0 60%, #cbd5e1 100%)'
       }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent z-0" />
+      <div className="ambient-aurora pointer-events-none fixed inset-0 overflow-hidden z-0">
+        <div className="aurora-blob blob-1" />
+        <div className="aurora-blob blob-2" />
+        <div className="aurora-blob blob-3" />
+      </div>
+
       {showQuitConfirm && (
         <ConfirmModal
           title={t('modal.confirmQuit')}
@@ -253,8 +270,6 @@ const App: React.FC = () => {
           onChange={(open) => {
             if (!open) {
               setShowAdminRequired(false)
-              // Dismissing the dialog means the user declines: remember it so the app stops
-              // asking on every launch and falls back to system proxy only.
               if (!adminRestartRequestedRef.current) {
                 declineElevation().catch(() => {})
               }
@@ -270,17 +285,44 @@ const App: React.FC = () => {
       )}
       <HwidLimitAlert />
       <CoreErrorAlert />
+
       {platform === 'darwin' && (
         <div className="fixed top-0.5 -left-1 h-14.25 flex items-center pl-3 z-100 app-drag">
           <WindowControls />
         </div>
       )}
-      <AppSidebar />
-      {latest?.version && <UpdateBanner latest={latest} />}
-      <div className="relative z-10 main grow h-full overflow-y-auto">
-        {page}
+
+      {/* Windows 11 Native Acrylic Titlebar */}
+      {platform === 'win32' && !appConfig?.useWindowFrame && (
+        <header className="titlebar shrink-0 app-drag relative z-50">
+          <div className="titlebar-brand">
+            <div className="koala-icon flex items-center justify-center">
+              <UzurNetLogo className="size-4.5" />
+            </div>
+            <div className="titlebar-text">
+              <span>UzurNet</span>
+              <span className="version-tag">{appVer ? `v${appVer}` : 'v1.6.0'}</span>
+            </div>
+            <div className="status-pill">
+              <span className="live-dot" />
+              <span>{appConfig?.mainSwitchMode === 'tun' ? 'Режим TUN активен' : 'Режим прокси активен'}</span>
+            </div>
+          </div>
+          <div className="window-controls app-nodrag">
+            <WindowControls />
+          </div>
+        </header>
+      )}
+
+      {/* Window Body: Win11 Fluent 220px Sidebar + Content Area */}
+      <div className="window-body flex-1 flex min-h-0 relative z-10 w-full overflow-hidden">
+        <AppSidebar />
+        <main className="content-area flex-1 h-full overflow-y-auto min-w-0 p-6">
+          {latest?.version && <UpdateBanner latest={latest} />}
+          {page}
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   )
 }
 

@@ -1,11 +1,9 @@
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent } from '@renderer/components/ui/card'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { cn } from '@renderer/lib/utils'
 import { mihomoUnfixedProxy } from '@renderer/utils/ipc'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Spinner } from '@renderer/components/ui/spinner'
-import { Gauge, MapPin } from 'lucide-react'
+import { parseServerNode, getPingClass } from '@renderer/utils/proxy-node'
+import CountryFlag from '@renderer/components/common/country-flag'
+import { MapPin, CheckCircle2, ShieldCheck } from 'lucide-react'
 
 interface Props {
   mutateProxies: () => void
@@ -13,190 +11,218 @@ interface Props {
     proxy: ControllerProxiesDetail | ControllerGroupDetail,
     url?: string
   ) => Promise<ControllerProxiesDelay>
-  proxyDisplayLayout: 'hidden' | 'single' | 'double'
+  proxyDisplayLayout?: 'hidden' | 'single' | 'double'
   proxy: ControllerProxiesDetail | ControllerGroupDetail
   group: ControllerMixedGroup
   onSelect: (group: string, proxy: string) => void
   selected: boolean
   isGroupDelaying?: boolean
-}
-
-function delayColorClass(delay: number): string {
-  if (delay === -1) return 'text-[#0078D4]'
-  if (delay === 0) return 'text-rose-400'
-  if (delay < 500) return 'text-emerald-400'
-  return 'text-amber-400'
+  reliability?: number
 }
 
 const ProxyItem: React.FC<Props> = React.memo((props) => {
-  const { t } = useTranslation()
-  const { mutateProxies, proxyDisplayLayout, group, proxy, selected, onSelect, onProxyDelay, isGroupDelaying } =
-    props
+  const {
+    mutateProxies,
+    group,
+    proxy,
+    selected,
+    onSelect,
+    onProxyDelay,
+    isGroupDelaying,
+    reliability
+  } = props
+
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [animKey, setAnimKey] = useState(0)
+  const [justDiscovered, setJustDiscovered] = useState(false)
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const delay = useMemo(() => {
-    if (proxy.history.length > 0) {
+    if (proxy.history && proxy.history.length > 0) {
       return proxy.history[proxy.history.length - 1].delay
     }
     return -1
   }, [proxy])
 
-  const [loading, setLoading] = useState(false)
-  const [waitingForNewDelay, setWaitingForNewDelay] = useState(false)
-  const delaySnapshot = useRef(delay)
+  const triggerSonarAnimation = useCallback(() => {
+    if (animTimerRef.current) clearTimeout(animTimerRef.current)
+    setAnimKey((k) => k + 1)
+    setJustDiscovered(true)
+    animTimerRef.current = setTimeout(() => {
+      setJustDiscovered(false)
+    }, 900)
+  }, [])
 
+  // When group delay test finishes for this proxy (transition from true -> false), trigger animation!
+  const prevGroupDelayingRef = useRef(isGroupDelaying)
   useEffect(() => {
-    if (isGroupDelaying) {
-      delaySnapshot.current = delay
-      setWaitingForNewDelay(true)
+    if (prevGroupDelayingRef.current && !isGroupDelaying) {
+      triggerSonarAnimation()
     }
-  }, [isGroupDelaying])
+    prevGroupDelayingRef.current = isGroupDelaying
+  }, [isGroupDelaying, triggerSonarAnimation])
 
+  // Also if delay value changes from any external update
+  const prevDelayRef = useRef(delay)
   useEffect(() => {
-    if (waitingForNewDelay && delay !== delaySnapshot.current) {
-      setWaitingForNewDelay(false)
+    if (prevDelayRef.current !== -1 && delay !== prevDelayRef.current) {
+      triggerSonarAnimation()
     }
-  }, [delay, waitingForNewDelay])
+    prevDelayRef.current = delay
+  }, [delay, triggerSonarAnimation])
 
-  useEffect(() => {
-    if (!waitingForNewDelay || isGroupDelaying) return undefined
-    const timer = setTimeout(() => setWaitingForNewDelay(false), 2000)
-    return () => clearTimeout(timer)
-  }, [waitingForNewDelay, isGroupDelaying])
+  const isDelaying = loading || isGroupDelaying
 
-  const showLoading = loading || isGroupDelaying || waitingForNewDelay
-
-  function delayContent(d: number): React.ReactNode {
-    if (d === -1) return <Gauge className="size-3.5" />
-    if (d === 0) return '–'
-    return d.toString()
-  }
-
-  const delayIndicator = (
-    <span className="relative inline-flex items-center justify-center w-full">
-      {showLoading && <Spinner className="size-3 absolute text-foreground" />}
-      <span className={cn(delayColorClass(delay), showLoading && 'invisible')}>
-        {delayContent(delay)}
-      </span>
-    </span>
+  const onDelay = useCallback(
+    (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation()
+      if (isDelaying) return
+      setLoading(true)
+      onProxyDelay(proxy, group?.testUrl)
+        .then(() => {
+          triggerSonarAnimation()
+        })
+        .catch(() => {
+          // Even on timeout or failure, play the animation
+          triggerSonarAnimation()
+        })
+        .finally(() => {
+          mutateProxies()
+          setLoading(false)
+        })
+    },
+    [isDelaying, onProxyDelay, proxy, group, mutateProxies, triggerSonarAnimation]
   )
 
-  const onDelay = (): void => {
-    setLoading(true)
-    onProxyDelay(proxy, group.testUrl).finally(() => {
-      mutateProxies()
-      setLoading(false)
-    })
-  }
+  const { countryCode, displayName } = useMemo(() => {
+    return parseServerNode(proxy.name)
+  }, [proxy.name])
 
-  const displayType =
-    !('all' in proxy) && proxy.serverDescription ? proxy.serverDescription : proxy.type
-  const fixed = group.fixed && group.fixed === proxy.name
+  const displayType = useMemo(() => {
+    if (!('all' in proxy) && proxy.serverDescription) return proxy.serverDescription
+    return proxy.type || 'VLESS'
+  }, [proxy])
+
+  const fixed = group?.fixed && group.fixed === proxy.name
+
+  // 3D Perspective Tilt on Hover (Prompt Motion Signature)
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current
+    if (!card) return
+    const rect = card.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    card.style.setProperty('--mouse-x', `${x}px`)
+    card.style.setProperty('--mouse-y', `${y}px`)
+
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const rotateX = ((y - centerY) / centerY) * -5
+    const rotateY = ((x - centerX) / centerX) * 5
+
+    card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-3px) scale3d(1.01, 1.01, 1.01)`
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    const card = cardRef.current
+    if (!card) return
+    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0) scale3d(1, 1, 1)'
+  }, [])
+
+  const isLowPing = delay > 0 && delay < 120
 
   return (
-    <Card
+    <div
+      ref={cardRef}
       onClick={() => onSelect(group.name, proxy.name)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       className={cn(
-        'w-full gap-0 py-0 rounded-lg cursor-pointer transition-all duration-150 relative overflow-hidden',
-        fixed
-          ? 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/50 shadow-xs'
-          : selected
-            ? 'bg-[#0078D4]/15 border-[#0078D4] shadow-[0_0_0_1px_#0078D4,0_2px_8px_rgba(0,120,212,0.25)]'
-            : 'bg-white/[0.04] border-white/[0.07] hover:bg-white/[0.07] hover:border-white/[0.12]'
+        'pm-card server-card select-none cursor-pointer relative overflow-hidden transition-all',
+        selected && 'active',
+        fixed && 'border-amber-500/40 bg-amber-500/5'
       )}
     >
-      <CardContent className="pl-4 pr-4 py-2">
-        <div
-          className={`flex ${proxyDisplayLayout === 'double' ? 'gap-1' : 'justify-between items-center'}`}
-        >
-          {proxyDisplayLayout === 'double' ? (
-            <>
-              <div className="flex flex-col gap-0 flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="flag-emoji text-sm truncate" title={proxy.name}>
-                    {proxy.name}
-                  </span>
-                </div>
-                <div className="text-[11px] text-muted-foreground leading-none mt-0.5">
-                  <span>{displayType}</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-center gap-0.5 shrink-0">
-                {fixed && (
-                  <Button
-                    variant="ghost"
-                    title={t('proxies.unpin')}
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      await mihomoUnfixedProxy(group.name)
-                      mutateProxies()
-                    }}
-                    className="h-6 w-6 min-w-6 p-0 text-amber-500 hover:text-amber-600 opacity-60 hover:opacity-100"
-                  >
-                    <MapPin className="text-xs" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  title={proxy.type}
-                  disabled={showLoading}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelay()
-                  }}
-                  className="h-7 w-8 min-w-8 px-0 text-xs font-medium cursor-pointer"
-                >
-                  {delayIndicator}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-1.5 text-ellipsis overflow-hidden whitespace-nowrap">
-                <span className="flag-emoji text-sm truncate" title={proxy.name}>
-                  {proxy.name}
-                </span>
-                {proxyDisplayLayout === 'single' && (
-                  <span className="text-muted-foreground text-xs shrink-0" title={displayType}>
-                    {displayType}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                {fixed && (
-                  <Button
-                    variant="ghost"
-                    title={t('proxies.unpin')}
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      await mihomoUnfixedProxy(group.name)
-                      mutateProxies()
-                    }}
-                    className="h-6 w-6 min-w-6 p-0 text-amber-500 hover:text-amber-600 opacity-60 hover:opacity-100"
-                  >
-                    <MapPin className="text-xs" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  title={proxy.type}
-                  disabled={showLoading}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelay()
-                  }}
-                  className="h-7 w-8 min-w-8 px-0 text-xs font-medium cursor-pointer"
-                >
-                  {delayIndicator}
-                </Button>
-              </div>
-            </>
-          )}
+      <div className="server-card-top flex items-center justify-between">
+        <div className="server-card-name flex items-center gap-2.5 min-w-0 pr-2">
+          {/* Vector SVG Country Flag Badge */}
+          <CountryFlag countryCode={countryCode} />
+          <span className="font-semibold text-sm truncate" title={proxy.name}>
+            {displayName}
+          </span>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {fixed && (
+            <button
+              type="button"
+              title="Открепить узел"
+              onClick={async (e) => {
+                e.stopPropagation()
+                await mihomoUnfixedProxy(group.name)
+                mutateProxies()
+              }}
+              className="text-amber-400 hover:text-amber-300 transition-colors p-1"
+            >
+              <MapPin className="size-3.5" />
+            </button>
+          )}
+
+          <span
+            key={`ping-${animKey}`}
+            onClick={onDelay}
+            title="Нажмите для проверки задержки"
+            className={cn(
+              'ping-tag shrink-0 cursor-pointer font-mono text-xs transition-all duration-300',
+              getPingClass(delay),
+              isDelaying && 'opacity-80',
+              justDiscovered && 'pinging'
+            )}
+          >
+            {isDelaying ? (
+              <span className="flex items-center gap-1.5 px-1">
+                <span className="live-dot size-1.5 animate-pulse" />
+                <span className="text-[11px]">тест...</span>
+              </span>
+            ) : delay === 0 ? (
+              'Таймаут'
+            ) : delay === -1 ? (
+              <span className="text-muted-foreground">– ms</span>
+            ) : (
+              <span className="flex items-center gap-1 font-semibold">
+                {selected && <CheckCircle2 className="size-3 text-emerald-400" />}
+                <span>{delay} ms</span>
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+
+      {/* Tags row: Clean protocol + Reliability Score Badge */}
+      <div className="server-tags flex items-center gap-1.5 mt-2 flex-wrap">
+        <span className={cn('srv-badge font-mono', isLowPing && 'fast')}>{displayType}</span>
+        {isLowPing && <span className="srv-badge fast">Быстрый</span>}
+        {reliability !== undefined && (
+          <span
+            title={`Рейтинг надёжности и аптайма узла: ${reliability}%`}
+            className={cn(
+              'srv-badge font-mono flex items-center gap-1',
+              reliability >= 85
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25'
+                : reliability >= 60
+                  ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25'
+                  : 'text-amber-400 bg-amber-500/10 border-amber-500/25'
+            )}
+          >
+            <ShieldCheck className="size-2.5" />
+            <span>{reliability}%</span>
+          </span>
+        )}
+      </div>
+    </div>
   )
 })
 
 ProxyItem.displayName = 'ProxyItem'
-
 export default ProxyItem

@@ -1,101 +1,64 @@
-# Koala Clash
-<p align="center">
-  <img src="./build/icon.png" alt="Clash" width="128" />
-  <br>
-  <br>
-  <a href="https://github.com/coolcoala/koala-clash/releases">
-    <img src="https://img.shields.io/github/release/coolcoala/koala-clash/all.svg">
-  </a>
-</p>
-<h3 align="center">GUI client for <a href="https://github.com/MetaCubeX/mihomo">Mihomo</a></h3>
+<div align="center">
+  <img src="docs/images/logo.png" width="128" height="128" alt="UzurNet Logo" />
+  <h1>UzurNet</h1>
+  <p><strong>Современный, быстрый и элегантный прокси-клиент для Windows 11</strong></p>
 
-## Features
+  <p>
+    <img src="https://img.shields.io/badge/Platform-Windows%2011-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows 11" />
+    <img src="https://img.shields.io/badge/Core-Mihomo-10B981?style=flat-square" alt="Mihomo Core" />
+    <img src="https://img.shields.io/badge/UI-Fluent%20Acrylic-06B6D4?style=flat-square" alt="Fluent Design" />
+    <img src="https://img.shields.io/badge/Version-v1.6.0-emerald?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" alt="License" />
+  </p>
+</div>
 
-- [x] Out-of-the-box Tun mode without service mode
-- [x] Multiple color themes
-- [x] Support for most Mihomo configuration options
-- [x] Built-in Mihomo cores (stable and alpha)
+---
 
-## Screenshots
-![Preview](./docs/preview.png)
+## 🌟 Особенности
 
-## Development
+- 💎 **Win11 Fluent Design**: Нативный акриловый интерфейс с поддержкой Mica, адаптивным сайдбаром и плавной анимацией движения карточек.
+- ⚡ **Smart Mesh Network**: Умное автоматическое переключение на сервер с наилучшим пингом без «пинг-понга» (EMA-сглаживание задержки + гистерезис).
+- 🛡️ **Аварийный Watchdog**: Непрерывный мониторинг активного узла с автоматическим переходом на резервный сервер при таймауте и сбросом зависших TCP-сессий.
+- 🚀 **HTTP Keep-Alive туннель**: Постоянное быстрое соединение с ядром без накладных расходов на открытие сокетов Windows.
+- 🎯 **TUN & System Proxy**: Полноценный TUN-режим с поддержкой Fake-IP, перехватом DNS и нулевыми утечками трафика.
+- 📊 **Рейтинг стабильности узлов**: Динамический скоринг надёжности и аптайма для каждого сервера прямо на карточке.
+- 🌐 **Широкая поддержка протоколов**: VLESS, Hysteria 2, Shadowsocks, VMess, Trojan, TUIC и WireGuard.
 
-### Requirements
+---
 
-- **Node.js** >= 20.0.0
-- **pnpm** >= 9.0.0
-- **Git**
+## 📥 Установка
 
-### Tech Stack
+Актуальные сборки доступны на странице [Releases](https://github.com/zwanter/uzurnet/releases):
 
-Koala Clash is built with Electron + React + TypeScript.
+- **Установщик (Setup)**: `UzurNet_x64-setup.exe` (автоматическая установка, создание ярлыков, интеграция в систему).
+- **Портативная версия (Portable)**: `UzurNet_x64-portable.7z` (не требует установки, все данные хранятся рядом с программой).
 
-**Frontend:** React 19, shadcn/UI, Tailwind CSS, Monaco Editor
+---
 
-**Backend:** Electron, Mihomo Core, sysproxy-go
+## 🛠️ Сборка из исходников
 
-### Quick Start
+Требования:
+- [Node.js](https://nodejs.org/) (v20+)
+- [pnpm](https://pnpm.io/) (v9+)
+- Windows 10/11 x64
 
 ```bash
-git clone https://github.com/coolcoala/koala-clash.git
-cd koala-clash
+# 1. Клонирование репозитория
+git clone https://github.com/zwanter/uzurnet.git
+cd uzurnet
+
+# 2. Установка зависимостей
 pnpm install
-pnpm dev
+
+# 3. Запуск в режиме разработки
+pnpm run dev
+
+# 4. Сборка установщика для Windows
+pnpm run build:win
 ```
 
-If Electron fails to install:
+---
 
-```bash
-cd node_modules/electron && node install.js && cd ../..
-```
+## 📄 Лицензия
 
-### Project Structure
-
-```
-src/
-├── main/               # Electron main process
-│   ├── core/           # Mihomo core management
-│   ├── config/         # Configuration management
-│   ├── resolve/        # Tray, shortcuts, auto-updater, floating window
-│   ├── sys/            # System integration (sysproxy, autorun)
-│   └── utils/          # Utilities
-├── renderer/           # React frontend
-│   └── src/
-│       ├── components/ # React components
-│       ├── pages/      # Page components
-│       ├── hooks/      # Hooks and context providers
-│       └── utils/      # Frontend utilities
-├── preload/            # Preload scripts (IPC bridge)
-└── shared/types/       # Shared TypeScript types
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start dev server (renderer hot reloads, main requires restart) |
-| `pnpm lint` | Run ESLint |
-| `pnpm format` | Run Prettier |
-| `pnpm typecheck` | TypeScript type checking |
-| `pnpm build:win` | Build for Windows |
-| `pnpm build:mac` | Build for macOS |
-| `pnpm build:linux` | Build for Linux |
-
-Architecture and format can be specified via flags:
-
-```bash
-pnpm build:win nsis --x64
-pnpm build:mac pkg --arm64
-pnpm build:linux deb --x64
-```
-
-### Build Artifacts
-
-- **Windows**: `.exe` (NSIS installer), `.7z` (portable)
-- **macOS**: `.pkg`
-- **Linux**: `.deb`, `.rpm`, `.pkg.tar.xz` (pacman)
-
-## Credits
-
-Based on [Sparkle](https://github.com/xishang0128/sparkle) by [xishang0128](https://github.com/xishang0128).
+Распространяется под лицензией [GPL-3.0](LICENSE).

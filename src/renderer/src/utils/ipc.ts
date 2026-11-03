@@ -550,6 +550,23 @@ export async function runAutoSelectProxy(): Promise<{
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('runAutoSelectProxy'))
 }
 
+export async function getServerMetrics(): Promise<
+  Record<
+    string,
+    {
+      name: string
+      emaDelay: number
+      lastDelay: number
+      successCount: number
+      failCount: number
+      reliability: number
+      lastTested: number
+    }
+  >
+> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getServerMetrics'))
+}
+
 // Override window.alert to use toast notifications instead of system dialogs
 async function alert<T>(msg: T): Promise<void> {
   const { toast } = await import('sonner')

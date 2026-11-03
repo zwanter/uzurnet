@@ -1,4 +1,4 @@
-import { existsSync } from 'fs'
+import { existsSync, cpSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import path from 'path'
 import { app } from 'electron'
@@ -9,6 +9,44 @@ import { addProfileItem } from '../config'
 const OLD_APP_ID = 'io.github.koala-clash'
 const MIGRATION_DONE_MARKER = '.migration-done'
 const MIGRATION_FILE = '.migration-profiles.yaml'
+
+/**
+ * Automatically migrate all Electron app data (configs, profiles, rules, themes)
+ * from legacy "Koala Clash" to "UzurNet" on first launch.
+ */
+export function migrateLegacyKoalaElectronData(): void {
+  try {
+    const targetDir = dataDir()
+    if (
+      existsSync(path.join(targetDir, 'config.yaml')) ||
+      existsSync(path.join(targetDir, 'profiles.yaml'))
+    ) {
+      return
+    }
+
+    const roaming = app.getPath('appData')
+    const candidates = [
+      path.join(roaming, 'Koala Clash'),
+      path.join(roaming, 'Koala-Clash'),
+      path.join(roaming, 'koala-clash')
+    ]
+
+    for (const oldPath of candidates) {
+      if (existsSync(oldPath) && oldPath !== targetDir) {
+        const hasOldData =
+          existsSync(path.join(oldPath, 'config.yaml')) ||
+          existsSync(path.join(oldPath, 'profiles.yaml'))
+        if (hasOldData) {
+          cpSync(oldPath, targetDir, { recursive: true, errorOnExist: false })
+          console.log(`[Migration]: Successfully migrated all user data from ${oldPath} to ${targetDir}`)
+          break
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[Migration]: Failed copying legacy Electron data', e)
+  }
+}
 
 interface OldPrfItem {
   uid?: string

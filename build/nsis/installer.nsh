@@ -1,3 +1,7 @@
+!macro preInit
+  StrCpy $INSTDIR "$PROGRAMFILES64\UzurNet"
+!macroend
+
 !macro customInit
   ; --- Migration from old Koala Clash (Tauri) app ---
 
@@ -37,6 +41,12 @@
 
   uninstall_done:
 
+  ; Set default installation directory to UzurNet
+  StrCpy $INSTDIR "$PROGRAMFILES64\UzurNet"
+
+  ; Kill any lingering mihomo process to release pipes
+  nsExec::Exec 'taskkill /F /IM mihomo.exe /T'
+
   ; Restore context for the rest of the installer
   SetShellVarContext all
 !macroend
@@ -45,9 +55,27 @@
   ; --- Copy migration file to new app data directory ---
   SetShellVarContext current
   IfFileExists "$TEMP\koala-clash-migration-profiles.yaml" 0 no_migration_file
-    CreateDirectory "$APPDATA\Koala-Clash"
-    CopyFiles /SILENT "$TEMP\koala-clash-migration-profiles.yaml" "$APPDATA\Koala-Clash\.migration-profiles.yaml"
+    CreateDirectory "$APPDATA\UzurNet"
+    CopyFiles /SILENT "$TEMP\koala-clash-migration-profiles.yaml" "$APPDATA\UzurNet\.migration-profiles.yaml"
     Delete "$TEMP\koala-clash-migration-profiles.yaml"
   no_migration_file:
+
+  ; Clean up legacy Koala Clash shortcuts so only UzurNet remains
+  Delete "$DESKTOP\Koala Clash.lnk"
+  Delete "$DESKTOP\Koala.Clash.lnk"
+  Delete "$SMPROGRAMS\Koala Clash.lnk"
+  Delete "$SMPROGRAMS\Koala Clash\Koala Clash.lnk"
+  RMDir "$SMPROGRAMS\Koala Clash"
+  Delete "$QUICKLAUNCH\Koala Clash.lnk"
+  Delete "$SMSTARTUP\Koala Clash.lnk"
+
   SetShellVarContext all
+  Delete "$DESKTOP\Koala Clash.lnk"
+  Delete "$DESKTOP\Koala.Clash.lnk"
+  Delete "$SMPROGRAMS\Koala Clash.lnk"
+  Delete "$SMPROGRAMS\Koala Clash\Koala Clash.lnk"
+  RMDir "$SMPROGRAMS\Koala Clash"
+
+  ; Clean up old Windows scheduled task
+  nsExec::Exec 'schtasks /delete /tn "koala-clash-run" /f'
 !macroend

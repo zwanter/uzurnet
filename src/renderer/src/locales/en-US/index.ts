@@ -965,7 +965,9 @@ export default {
 
   notifications: {
     taskScheduleManagement: 'Task Schedule Management',
-    coreAuthManagement: 'Core Authorization Management'
+    coreAuthManagement: 'Core Authorization Management',
+    profileImportSuccess: 'Profile imported successfully',
+    profileUpdateSuccess: 'Profile updated successfully'
   },
 
   guide: {

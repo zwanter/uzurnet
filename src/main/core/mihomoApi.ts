@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import http from 'http'
 import { getAppConfig, getControledMihomoConfig } from '../config'
 import { mainWindow } from '..'
 import WebSocket from 'ws'
@@ -16,6 +17,7 @@ import { CoreError, reportCoreError, setCoreStatus } from './status'
 const CORE_UNREACHABLE_CODES = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE'])
 
 let axiosIns: AxiosInstance = null!
+let mihomoHttpAgent: http.Agent | null = null
 let mihomoTrafficWs: WebSocket | null = null
 let trafficRetry = 10
 let mihomoMemoryWs: WebSocket | null = null
@@ -35,10 +37,25 @@ export const getAxios = async (force: boolean = false): Promise<AxiosInstance> =
 
   if (axiosIns && !force) return axiosIns
 
+  if (mihomoHttpAgent) {
+    try {
+      mihomoHttpAgent.destroy()
+    } catch {
+      // ignore
+    }
+  }
+
+  mihomoHttpAgent = new http.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 15000,
+    maxSockets: 50
+  })
+
   axiosIns = axios.create({
     baseURL: `http://localhost`,
     socketPath: currentSocketPath,
-    timeout: 15000
+    timeout: 15000,
+    httpAgent: mihomoHttpAgent
   })
 
   axiosIns.interceptors.response.use(

@@ -996,6 +996,8 @@ export default {
 
   notifications: {
     taskScheduleManagement: '任务计划管理',
-    coreAuthManagement: '内核授权管理'
+    coreAuthManagement: '内核授权管理',
+    profileImportSuccess: '订阅导入成功',
+    profileUpdateSuccess: '订阅更新成功'
   }
 }

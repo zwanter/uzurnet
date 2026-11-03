@@ -967,7 +967,9 @@ export default {
 
   notifications: {
     taskScheduleManagement: 'Управление планировщиком задач',
-    coreAuthManagement: 'Управление авторизацией ядра'
+    coreAuthManagement: 'Управление авторизацией ядра',
+    profileImportSuccess: 'Подписка успешно импортирована',
+    profileUpdateSuccess: 'Подписка успешно обновлена'
   },
 
   guide: {

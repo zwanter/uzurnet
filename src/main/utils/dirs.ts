@@ -58,13 +58,13 @@ export function themesDir(): string {
 
 export function mihomoIpcPath(): string {
   if (process.platform === 'win32') {
-    return '\\\\.\\pipe\\Koala-Clash\\mihomo'
+    return '\\\\.\\pipe\\UzurNet\\mihomo'
   }
   const { core = 'mihomo' } = getAppConfigSync()
   if (!checkCorePermissionSync(core)) {
-    return '/tmp/koala-clash-mihomo-api-noperm.sock'
+    return '/tmp/uzurnet-mihomo-api-noperm.sock'
   }
-  return '/tmp/koala-clash-mihomo-api.sock'
+  return '/tmp/uzurnet-mihomo-api.sock'
 }
 
 export function serviceIpcPath(): string {

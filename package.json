@@ -1,7 +1,7 @@
 {
-  "name": "koala-clash",
-  "version": "1.5.0",
-  "description": "Koala Clash",
+  "name": "uzurnet",
+  "version": "1.6.0",
+  "description": "UzurNet",
   "main": "./out/main/index.js",
   "author": "xishang0128, co-author: coolcoala",
   "homepage": "https://github.com/zwanter/koala-clash",

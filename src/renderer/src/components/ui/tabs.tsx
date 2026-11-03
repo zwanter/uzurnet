@@ -70,13 +70,13 @@ function TabsTrigger({
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring focus-visible:ring-[3px] focus-visible:outline-1",
         // Active state — default variant
-        "group-data-[variant=default]/tabs-list:data-[state=active]:bg-white/[0.12]",
-        "group-data-[variant=default]/tabs-list:data-[state=active]:border-white/[0.10]",
-        "group-data-[variant=default]/tabs-list:data-[state=active]:text-white",
-        "group-data-[variant=default]/tabs-list:data-[state=active]:shadow-xs",
+        "group-data-[variant=default]/tabs-list:data-[state=active]:bg-emerald-500/20",
+        "group-data-[variant=default]/tabs-list:data-[state=active]:border-emerald-500/40",
+        "group-data-[variant=default]/tabs-list:data-[state=active]:text-emerald-400",
+        "group-data-[variant=default]/tabs-list:data-[state=active]:shadow-xs group-data-[variant=default]/tabs-list:data-[state=active]:shadow-emerald-500/20",
         // Active state — line variant
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "after:absolute after:opacity-0 after:transition-opacity after:bg-[#0078D4]",
+        "after:absolute after:opacity-0 after:transition-opacity after:bg-emerald-500",
         "group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=horizontal]/tabs:after:rounded-full",
         "group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[orientation=vertical]/tabs:after:rounded-full",
         "group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100 group-data-[variant=line]/tabs-list:data-[state=active]:text-foreground",

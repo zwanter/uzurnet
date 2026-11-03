@@ -1,63 +1,29 @@
-import { Avatar, AvatarImage } from '@renderer/components/ui/avatar'
-import { Badge } from '@renderer/components/ui/badge'
-import { Button } from '@renderer/components/ui/button'
-import { Card, CardContent } from '@renderer/components/ui/card'
-import { Spinner } from '@renderer/components/ui/spinner'
-import BasePage from '@renderer/components/base/base-page'
+import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import { useGroups } from '@renderer/hooks/use-groups'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
+import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import {
-  getImageDataURL,
   mihomoChangeProxy,
   mihomoCloseAllConnections,
   mihomoProxyDelay,
-  runAutoSelectProxy
+  runAutoSelectProxy,
+  getServerMetrics
 } from '@renderer/utils/ipc'
-import { toast } from 'sonner'
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
-import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso'
+import { includesIgnoreCase } from '@renderer/utils/includes'
 import ProxyItem from '@renderer/components/proxies/proxy-item'
 import ProxySettingModal from '@renderer/components/proxies/proxy-setting-modal'
-import { useGroups } from '@renderer/hooks/use-groups'
-import CollapseInput from '@renderer/components/base/collapse-input'
-import { includesIgnoreCase } from '@renderer/utils/includes'
-import { cn } from '@renderer/lib/utils'
-import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
-import { useTranslation } from 'react-i18next'
 import {
-  ChevronDown,
-  ChevronsDownUp,
   ChevronsRight,
-  ChevronsUpDown,
-  Gauge,
-  MousePointerClick,
-  LocateFixed,
-  Route,
-  Scale,
-  Shield,
   SlidersHorizontal,
   Sparkles,
-  Zap
+  Zap,
+  Search,
+  ArrowUpDown
 } from 'lucide-react'
-
-const groupTypeColor: Record<string, string> = {
-  Selector: 'border-blue-500/40 bg-blue-500/8 text-blue-600 dark:text-blue-400 dark:border-blue-400/40',
-  URLTest:
-    'border-emerald-500/40 bg-emerald-500/8 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400/40',
-  Fallback:
-    'border-amber-500/40 bg-amber-500/8 text-amber-600 dark:text-amber-400 dark:border-amber-400/40',
-  LoadBalance:
-    'border-violet-500/40 bg-violet-500/8 text-violet-600 dark:text-violet-400 dark:border-violet-400/40',
-  Relay: 'border-rose-500/40 bg-rose-500/8 text-rose-600 dark:text-rose-400 dark:border-rose-400/40'
-}
-
-const groupTypeIcon: Record<string, React.ReactNode> = {
-  Selector: <MousePointerClick className="size-4" />,
-  URLTest: <Zap className="size-4" />,
-  Fallback: <Shield className="size-4" />,
-  LoadBalance: <Scale className="size-4" />,
-  Relay: <Route className="size-4" />
-}
+import { cn } from '@renderer/lib/utils'
+import { motion, AnimatePresence } from 'motion/react'
 
 function getProviderName(proxy: ControllerProxiesDetail | ControllerGroupDetail): string | undefined {
   return 'provider-name' in proxy ? proxy['provider-name'] : undefined
@@ -65,135 +31,81 @@ function getProviderName(proxy: ControllerProxiesDetail | ControllerGroupDetail)
 
 const Proxies: React.FC = () => {
   const { t } = useTranslation()
-  const location = useLocation()
-  const fromHome = (location.state as { fromHome?: boolean })?.fromHome ?? false
   const { controledMihomoConfig } = useControledMihomoConfig()
   const { mode = 'rule' } = controledMihomoConfig || {}
   const { groups = [], mutate } = useGroups()
   const { appConfig } = useAppConfig()
   const {
-    proxyDisplayLayout = 'double',
-    groupDisplayLayout = 'double',
-    proxyDisplayOrder = 'default',
     autoCloseConnection = true,
-    proxyCols = 'auto',
     delayTestConcurrency = 50,
-    expandProxyGroups = false
+    proxyDisplayOrder = 'delay'
   } = appConfig || {}
-  const [cols, setCols] = useState(1)
-  const [isOpen, setIsOpen] = useState<boolean[]>([])
-  const [delaying, setDelaying] = useState<boolean[]>([])
-  const [searchValue, setSearchValue] = useState<string[]>([])
-  const [iconLoadTick, setIconLoadTick] = useState(0)
-  const delayingProxiesRef = useRef<Set<string>>(new Set())
-  const completedProxiesRef = useRef<Set<string>>(new Set())
-  const [delayingTick, setDelayingTick] = useState(0)
-  const prevGroupsLengthRef = useRef(0)
+
+  const [activeGroupIndex, setActiveGroupIndex] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
   const [isSettingModalOpen, setIsSettingModalOpen] = useState(false)
   const [isAutoSelecting, setIsAutoSelecting] = useState(false)
-  const virtuosoRef = useRef<GroupedVirtuosoHandle>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const hasScrolledRef = useRef(false)
-  const groupsRef = useRef(groups)
-  const allProxiesRef = useRef<(ControllerProxiesDetail | ControllerGroupDetail)[][]>([])
-  const groupCountsRef = useRef<number[]>([])
-  const recentlyOpenedRef = useRef<Set<number>>(new Set())
+  const [isTestingGroup, setIsTestingGroup] = useState(false)
+  const [sortByDelay, setSortByDelay] = useState(true)
+
+  // Reliability metrics map from backend
+  const [serverMetrics, setServerMetrics] = useState<Record<string, { reliability: number; emaDelay: number }>>({})
+
+  // Optimistic UI state for active proxy selection
+  const [optimisticSelection, setOptimisticSelection] = useState<{ group: string; proxy: string } | null>(null)
+
+  const delayingProxiesRef = useRef<Set<string>>(new Set())
+  const [delayingTick, setDelayingTick] = useState(0)
+
+  // Listen for real-time server metrics updates and watchdog emergency switches
   useEffect(() => {
-    if (groups.length !== prevGroupsLengthRef.current) {
-      prevGroupsLengthRef.current = groups.length
-      setIsOpen((prev) => {
-        if (prev.length === groups.length) return prev
-        const next = Array(groups.length).fill(expandProxyGroups)
-        prev.forEach((v, i) => { if (i < next.length) next[i] = v })
-        return next
+    getServerMetrics()
+      .then((m) => {
+        if (m) setServerMetrics(m)
       })
-      setDelaying((prev) => {
-        if (prev.length === groups.length) return prev
-        const next = Array(groups.length).fill(false)
-        prev.forEach((v, i) => { if (i < next.length) next[i] = v })
-        return next
-      })
-      setSearchValue((prev) => {
-        if (prev.length === groups.length) return prev
-        const next = Array(groups.length).fill('')
-        prev.forEach((v, i) => { if (i < next.length) next[i] = v })
-        return next
-      })
+      .catch(() => {})
+
+    const handleMetricsUpdated = (_e: unknown, metrics: Record<string, { reliability: number; emaDelay: number }>): void => {
+      if (metrics) setServerMetrics(metrics)
     }
-  }, [groups.length, expandProxyGroups])
 
-  // Re-apply to every group when the setting itself flips (e.g. a subscription sent the
-  // `expand-proxy-groups` header while this page is already open).
-  const prevExpandProxyGroupsRef = useRef(expandProxyGroups)
-  useEffect(() => {
-    if (prevExpandProxyGroupsRef.current === expandProxyGroups) return
-    prevExpandProxyGroupsRef.current = expandProxyGroups
-    setIsOpen((prev) => prev.map(() => expandProxyGroups))
-  }, [expandProxyGroups])
-
-  useEffect(() => {
-    groups.forEach((group) => {
-      if (group.icon && group.icon.startsWith('http') && !localStorage.getItem(group.icon)) {
-        getImageDataURL(group.icon).then((dataURL) => {
-          localStorage.setItem(group.icon, dataURL)
-          setIconLoadTick((c) => c + 1)
-        })
-      }
-    })
-    if (completedProxiesRef.current.size > 0) {
-      const completed = completedProxiesRef.current
-      completedProxiesRef.current = new Set()
-      completed.forEach((name) => delayingProxiesRef.current.delete(name))
-      setDelayingTick((c) => c + 1)
-    }
-  }, [groups])
-
-  const { groupCounts, allProxies } = useMemo(() => {
-    const groupCounts: number[] = []
-    const allProxies: (ControllerProxiesDetail | ControllerGroupDetail)[][] = []
-    groups.forEach((group, index) => {
-      if (isOpen[index]) {
-        let groupProxies = group.all.filter(
-          (proxy) => proxy && includesIgnoreCase(proxy.name, searchValue[index])
-        )
-        const count = Math.floor(groupProxies.length / cols)
-        groupCounts.push(groupProxies.length % cols === 0 ? count : count + 1)
-        if (proxyDisplayOrder === 'delay') {
-          groupProxies = groupProxies.sort((a, b) => {
-            if (a.history.length === 0) return -1
-            if (b.history.length === 0) return 1
-            if (a.history[a.history.length - 1].delay === 0) return 1
-            if (b.history[b.history.length - 1].delay === 0) return -1
-            return a.history[a.history.length - 1].delay - b.history[b.history.length - 1].delay
-          })
-        }
-        if (proxyDisplayOrder === 'name') {
-          groupProxies = groupProxies.sort((a, b) => a.name.localeCompare(b.name))
-        }
-        allProxies.push(groupProxies)
-      } else {
-        groupCounts.push(0)
-        allProxies.push([])
-      }
-    })
-    return { groupCounts, allProxies }
-  }, [groups, isOpen, proxyDisplayOrder, cols, searchValue])
-
-  groupsRef.current = groups
-  allProxiesRef.current = allProxies
-  groupCountsRef.current = groupCounts
-
-  const allExpanded = useMemo(() => {
-    return groups.length > 0 && isOpen.every(Boolean)
-  }, [groups, isOpen])
-
-  const onChangeProxy = useCallback(
-    async (group: string, proxy: string): Promise<void> => {
-      await mihomoChangeProxy(group, proxy)
-      if (autoCloseConnection) {
-        await mihomoCloseAllConnections(group)
-      }
+    const handleWatchdogEmergency = (
+      _e: unknown,
+      data: { group: string; deadServer: string; newServer: string }
+    ): void => {
+      toast.warning(`Узел ${data.deadServer} недоступен. Сторож переключил на ${data.newServer}`)
       mutate()
+    }
+
+    window.electron.ipcRenderer.on('serverMetricsUpdated', handleMetricsUpdated)
+    window.electron.ipcRenderer.on('serverWatchdogEmergencySwitch', handleWatchdogEmergency)
+
+    return (): void => {
+      window.electron.ipcRenderer.removeAllListeners('serverMetricsUpdated')
+      window.electron.ipcRenderer.removeAllListeners('serverWatchdogEmergencySwitch')
+    }
+  }, [mutate])
+
+  // Current active group
+  const validIndex = activeGroupIndex < groups.length ? activeGroupIndex : 0
+  const currentGroup = groups[validIndex]
+
+  // Optimistic & Immediate Proxy Switch
+  const onChangeProxy = useCallback(
+    async (groupName: string, proxyName: string): Promise<void> => {
+      // 0ms Optimistic selection
+      setOptimisticSelection({ group: groupName, proxy: proxyName })
+      try {
+        await mihomoChangeProxy(groupName, proxyName)
+        // Clean drop of dead sockets to prevent stalls
+        if (autoCloseConnection) {
+          await mihomoCloseAllConnections(groupName).catch(() => {})
+        }
+        mutate()
+      } catch (e) {
+        setOptimisticSelection(null)
+        toast.error(`${e}`)
+      }
     },
     [autoCloseConnection, mutate]
   )
@@ -216,382 +128,176 @@ const Proxies: React.FC = () => {
       mutateThrottleRef.current = null
     }, 500)
   }, [mutate])
-  useEffect(() => {
-    return () => {
-      if (mutateThrottleRef.current) clearTimeout(mutateThrottleRef.current)
-    }
-  }, [])
 
-  const onGroupDelay = useCallback(
-    async (index: number): Promise<void> => {
-      if (allProxies[index].length === 0) {
-        setIsOpen((prev) => {
-          const newOpen = [...prev]
-          newOpen[index] = true
-          return newOpen
+  // Domino Ping Cascade for all nodes in the active group
+  const handlePingAll = useCallback(async () => {
+    if (!currentGroup || isTestingGroup) return
+    setIsTestingGroup(true)
+    const list = currentGroup.all || []
+
+    list.forEach((p) => {
+      if (p?.name) delayingProxiesRef.current.add(p.name)
+    })
+    setDelayingTick((c) => c + 1)
+
+    const runningList: Promise<void>[] = []
+    const results: Promise<void>[] = []
+
+    for (const proxy of list) {
+      if (!proxy?.name) continue
+      const task = onProxyDelay(proxy, currentGroup.testUrl)
+        .then(() => {
+          delayingProxiesRef.current.delete(proxy.name)
+          setDelayingTick((c) => c + 1)
+          throttledMutate()
         })
+        .catch(() => {
+          delayingProxiesRef.current.delete(proxy.name)
+          setDelayingTick((c) => c + 1)
+          throttledMutate()
+        })
+
+      runningList.push(task)
+      results.push(task)
+
+      if (runningList.length >= (delayTestConcurrency || 50)) {
+        await Promise.race(runningList)
+        const idx = runningList.findIndex((t) => t === task)
+        if (idx !== -1) runningList.splice(idx, 1)
       }
-      setDelaying((prev) => {
-        const newDelaying = [...prev]
-        newDelaying[index] = true
-        return newDelaying
-      })
-      allProxies[index].forEach((p) => delayingProxiesRef.current.add(p.name))
-      setDelayingTick((c) => c + 1)
-      const result: Promise<void>[] = []
-      const runningList: Promise<void>[] = []
-      for (const proxy of allProxies[index]) {
-        const promise = Promise.resolve().then(async () => {
-          try {
-            await mihomoProxyDelay(proxy.name, groups[index].testUrl, getProviderName(proxy))
-          } catch {
-            // ignore
-          } finally {
-            completedProxiesRef.current.add(proxy.name)
-            throttledMutate()
-          }
-        })
-        result.push(promise)
-        const running = promise.then(() => {
-          runningList.splice(runningList.indexOf(running), 1)
-        })
-        runningList.push(running)
-        if (runningList.length >= (delayTestConcurrency || 50)) {
-          await Promise.race(runningList)
+    }
+
+    await Promise.all(results)
+    mutate()
+    setIsTestingGroup(false)
+    toast.success('Тест задержки всех узлов завершён')
+  }, [currentGroup, isTestingGroup, delayTestConcurrency, onProxyDelay, mutate, throttledMutate])
+
+  // Filtered & Smart-Sorted proxies: from lowest delay to highest (Timeouts & untracked at bottom)
+  const filteredProxies = useMemo(() => {
+    if (!currentGroup?.all) return []
+    let list = currentGroup.all.filter((p) => p && includesIgnoreCase(p.name, searchTerm))
+
+    if (sortByDelay || proxyDisplayOrder === 'delay') {
+      list = [...list].sort((a, b) => {
+        const aDelay = a.history && a.history.length > 0 ? a.history[a.history.length - 1].delay : -1
+        const bDelay = b.history && b.history.length > 0 ? b.history[b.history.length - 1].delay : -1
+
+        // 1. Untested (-1) and Timeouts (0) go to the very bottom
+        const aValid = aDelay > 0
+        const bValid = bDelay > 0
+
+        if (aValid && !bValid) return -1
+        if (!aValid && bValid) return 1
+
+        if (!aValid && !bValid) {
+          // Timeout (0) ranks higher than completely untested (-1)
+          if (aDelay === 0 && bDelay === -1) return -1
+          if (aDelay === -1 && bDelay === 0) return 1
+          return a.name.localeCompare(b.name)
         }
-      }
-      await Promise.all(result)
-      mutate()
-      setDelaying((prev) => {
-        const newDelaying = [...prev]
-        newDelaying[index] = false
-        return newDelaying
+
+        // 2. Both valid: sort strictly from lowest ping to highest
+        if (aDelay !== bDelay) {
+          return aDelay - bDelay
+        }
+
+        // Tie-breaker: by reliability score
+        const aRel = serverMetrics[a.name]?.reliability ?? 50
+        const bRel = serverMetrics[b.name]?.reliability ?? 50
+        return bRel - aRel
       })
-    },
-    [allProxies, groups, delayTestConcurrency, mutate, throttledMutate]
-  )
-
-  const calcCols = useCallback((): number => {
-    if (window.matchMedia('(min-width: 1536px)').matches) {
-      return 5
-    } else if (window.matchMedia('(min-width: 1280px)').matches) {
-      return 4
-    } else if (window.matchMedia('(min-width: 1024px)').matches) {
-      return 3
-    } else {
-      return 2
+    } else if (proxyDisplayOrder === 'name') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name))
     }
-  }, [])
+    return list
+  }, [currentGroup, searchTerm, sortByDelay, proxyDisplayOrder, delayingTick, serverMetrics])
 
-  const toggleOpen = useCallback((index: number) => {
-    setIsOpen((prev) => {
-      const newOpen = [...prev]
-      newOpen[index] = !prev[index]
-      if (!prev[index]) {
-        recentlyOpenedRef.current.add(index)
-        setTimeout(() => recentlyOpenedRef.current.delete(index), 1000)
-      }
-      return newOpen
-    })
-  }, [])
-
-  const toggleAll = useCallback(() => {
-    setIsOpen((prev) => {
-      const shouldExpand = !prev.every(Boolean)
-      if (shouldExpand) {
-        prev.forEach((v, i) => {
-          if (!v) recentlyOpenedRef.current.add(i)
-        })
-        setTimeout(() => recentlyOpenedRef.current.clear(), 1000)
-      }
-      return Array(prev.length).fill(shouldExpand)
-    })
-  }, [])
-
-  const updateSearchValue = useCallback((index: number, value: string) => {
-    setSearchValue((prev) => {
-      const newSearchValue = [...prev]
-      newSearchValue[index] = value
-      return newSearchValue
-    })
-  }, [])
-
-  const scrollToCurrentProxy = useCallback(
-    (index: number) => {
-      if (!isOpen[index]) {
-        setIsOpen((prev) => {
-          const newOpen = [...prev]
-          newOpen[index] = true
-          return newOpen
-        })
-      }
-      let i = 0
-      for (let j = 0; j < index; j++) {
-        i += groupCounts[j]
-      }
-      i += Math.floor(
-        allProxies[index].findIndex((proxy) => proxy.name === groups[index].now) / cols
-      )
-      virtuosoRef.current?.scrollToIndex({
-        index: Math.floor(i),
-        align: 'start'
-      })
-    },
-    [isOpen, groupCounts, allProxies, groups, cols]
-  )
-
-  useEffect(() => {
-    if (proxyCols !== 'auto') {
-      setCols(parseInt(proxyCols))
-      return
-    }
-    setCols(calcCols())
-    const handleResize = (): void => {
-      setCols(calcCols())
-    }
-    window.addEventListener('resize', handleResize)
-    return (): void => {
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [proxyCols, calcCols])
-
-  const groupContent = useCallback(
-    (index: number) => {
-      const group = groups[index]
-      if (!group) return <div>Never See This</div>
-
-      const typeColorClass =
-        groupTypeColor[group.type] || 'border-muted bg-muted text-muted-foreground'
-      const isExpanded = groupCounts[index] > 0
-      const showMeta = groupDisplayLayout !== 'hidden'
-
-      return (
-        <div
-          className="w-full px-2 pb-2"
-        >
-          <Card
-            data-guide={index === 0 ? 'proxies-first-group' : undefined}
-            data-guide-open={index === 0 ? `${isOpen[index]}` : undefined}
-            className={cn('w-full relative isolate bg-card/50 backdrop-blur-3xl cursor-pointer py-0 transition-all duration-200 hover:bg-card/65', isExpanded ? 'z-10 shadow-md' : 'hover:shadow-sm')}
-            role="button"
-            tabIndex={0}
-            onClick={() => toggleOpen(index)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                toggleOpen(index)
-              }
-            }}
-          >
-            <CardContent className="w-full px-4 py-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {group.icon ? (
-                    <Avatar className="bg-transparent rounded-md shrink-0 size-9">
-                      <AvatarImage
-                        src={
-                          group.icon.startsWith('<svg')
-                            ? `data:image/svg+xml;utf8,${group.icon}`
-                            : localStorage.getItem(group.icon) || group.icon
-                        }
-                      />
-                    </Avatar>
-                  ) : (
-                    <div className={cn('flex items-center justify-center shrink-0 size-9 rounded-md', typeColorClass)}>
-                      {groupTypeIcon[group.type] || <Zap className="size-4" />}
-                    </div>
-                  )}
-                  <div className={`flex ${groupDisplayLayout === 'double' ? 'flex-col gap-0.5' : 'items-center gap-2'} min-w-0`}>
-                    <div className="flex items-center gap-2">
-                      <span className="flag-emoji text-sm font-semibold truncate leading-tight">
-                        {group.name}
-                      </span>
-                      {showMeta && (
-                        <Badge
-                          variant="ghost"
-                          className={cn('text-[10px] px-1.5 py-0 h-4 rounded font-semibold uppercase tracking-wider shrink-0', typeColorClass)}
-                        >
-                          {group.type}
-                        </Badge>
-                      )}
-                    </div>
-                    {showMeta && (
-                      <span className="flag-emoji text-xs text-muted-foreground truncate leading-tight">
-                        {group.now}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                    <CollapseInput
-                      value={searchValue[index]}
-                      onValueChange={(v) => updateSearchValue(index, v)}
-                    />
-                    <Button
-                      title={t('sider.locateCurrentNode')}
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => scrollToCurrentProxy(index)}
-                    >
-                      <LocateFixed className="text-base" />
-                    </Button>
-                    <Button
-                      title={t('sider.delayTest')}
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={delaying[index]}
-                      aria-busy={delaying[index]}
-                      onClick={() => onGroupDelay(index)}
-                    >
-                      {delaying[index] ? (
-                        <Spinner className="size-4" />
-                      ) : (
-                        <Gauge className="text-base" />
-                      )}
-                    </Button>
-                  </div>
-                  <ChevronDown
-                    className={`transition-transform duration-200 ml-1 size-5 ${isOpen[index] ? 'rotate-180' : ''}`}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )
-    },
-    [
-      groups,
-      groupCounts,
-      isOpen,
-      groupDisplayLayout,
-      searchValue,
-      delaying,
-      iconLoadTick,
-      toggleOpen,
-      updateSearchValue,
-      scrollToCurrentProxy,
-      onGroupDelay,
-      t
-    ]
-  )
-
-  const itemContent = useCallback(
-    (index: number, groupIndex: number) => {
-      const currentGroupCounts = groupCountsRef.current
-      const currentAllProxies = allProxiesRef.current
-      const currentGroups = groupsRef.current
-      let innerIndex = index
-      currentGroupCounts.slice(0, groupIndex).forEach((count) => {
-        innerIndex -= count
-      })
-      const isLastRow = innerIndex === currentGroupCounts[groupIndex] - 1
-      const shouldAnimate = recentlyOpenedRef.current.has(groupIndex)
-      return currentAllProxies[groupIndex] ? (
-        <div className="flow-root">
-          <div
-            className={cn('mx-2 bg-card/30 border-x border-border/50', innerIndex === 0 && '-mt-5 pt-3', isLastRow && 'rounded-b-xl border-b shadow-sm mb-2', shouldAnimate && 'animate-proxy-row-enter')}
-            style={shouldAnimate ? { animationDelay: `${Math.min(innerIndex * 0.04, 0.3)}s` } : undefined}
-          >
-            <div
-              data-guide={groupIndex === 0 ? 'proxies-first-group-row' : undefined}
-              style={
-                proxyCols !== 'auto'
-                  ? { gridTemplateColumns: `repeat(${proxyCols}, minmax(0, 1fr))` }
-                  : {}
-              }
-              className={cn('grid gap-2 px-3 pt-2', proxyCols === 'auto' && 'sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5', isLastRow && 'pb-3')}
-            >
-              {Array.from({ length: cols }).map((_, i) => {
-                const proxy = currentAllProxies[groupIndex][innerIndex * cols + i]
-                if (!proxy) return null
-                return (
-                  <ProxyItem
-                    key={proxy.name}
-                    mutateProxies={mutate}
-                    onProxyDelay={onProxyDelay}
-                    onSelect={onChangeProxy}
-                    proxy={proxy}
-                    group={currentGroups[groupIndex]}
-                    proxyDisplayLayout={proxyDisplayLayout}
-                    selected={proxy.name === currentGroups[groupIndex]?.now}
-                    isGroupDelaying={delayingProxiesRef.current.has(proxy.name)}
-                  />
-                )
-              })}
-            </div>
+  if (mode === 'direct') {
+    return (
+      <div className="h-full w-full flex justify-center items-center select-none">
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-full bg-white/5 border border-white/10 p-6">
+            <ChevronsRight className="text-muted-foreground text-5xl" />
           </div>
+          <h2 className="text-muted-foreground text-lg font-medium">{t('sider.directMode')}</h2>
+          <p className="text-xs text-muted-foreground">Прямой режим без проксирования</p>
         </div>
-      ) : (
-        <div>Never See This</div>
-      )
-    },
-    [
-      proxyCols,
-      cols,
-      mutate,
-      onProxyDelay,
-      onChangeProxy,
-      proxyDisplayLayout,
-      delayingTick
-    ]
-  )
+      </div>
+    )
+  }
+
+  const currentActiveName =
+    optimisticSelection?.group === currentGroup?.name ? optimisticSelection.proxy : currentGroup?.now
 
   return (
-    <BasePage
-      title={t('pages.proxies.title')}
-      showBackButton={fromHome}
-      header={
-        <>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="app-nodrag"
-            title={allExpanded ? t('pages.proxies.collapseAll') : t('pages.proxies.expandAll')}
-            onClick={toggleAll}
-          >
-            {allExpanded ? (
-              <ChevronsDownUp className="text-lg" />
-            ) : (
-              <ChevronsUpDown className="text-lg" />
+    <div className="page-tab-content active-page w-full flex flex-col gap-5 select-none">
+      {isSettingModalOpen && <ProxySettingModal onClose={() => setIsSettingModalOpen(false)} />}
+
+      {/* Modern Win11 Section Header Bar (Prompt Motion Polish) */}
+      <div className="section-head-bar flex items-center justify-between gap-4 flex-wrap pb-1">
+        <div>
+          <div className="sec-title text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span>Управление прокси-группами</span>
+            <span className="text-[11px] font-normal px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+              Smart Mesh
+            </span>
+          </div>
+          <div className="sec-desc text-xs text-muted-foreground mt-0.5">
+            Сортировка по минимальному пингу, рейтинг стабильности и Watchdog-защита
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          {/* Search bar */}
+          <div className="relative flex items-center">
+            <Search className="size-3.5 absolute left-3 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Поиск сервера..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg bg-white/[0.04] border border-white/[0.08] text-foreground focus:outline-none focus:border-emerald-500/60 transition-colors w-40 hover:border-white/20"
+            />
+          </div>
+
+          {/* Toggle lowest ping sort */}
+          <button
+            onClick={() => setSortByDelay((prev) => !prev)}
+            title={sortByDelay ? 'Сортировка: по возрастанию пинга (активна)' : 'Включить сортировку по пингу'}
+            className={cn(
+              'pm-btn flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg cursor-pointer transition-all',
+              sortByDelay
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+                : 'text-muted-foreground hover:text-foreground'
             )}
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="app-nodrag"
-            title={t('autoSelect.runButton', 'Автовыбор сервера с минимальным пингом')}
-            disabled={isAutoSelecting}
+          >
+            <ArrowUpDown className="size-3.5" />
+            <span className="text-[11px]">По пингу</span>
+          </button>
+
+          {/* Test Ping button with sonar domino */}
+          <button
+            onClick={handlePingAll}
+            disabled={isTestingGroup}
+            className={cn(
+              'pm-btn primary flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg cursor-pointer',
+              isTestingGroup && 'opacity-80'
+            )}
+          >
+            <Zap className="size-3.5" />
+            <span>{isTestingGroup ? 'Тестирование...' : 'Тест пинга'}</span>
+          </button>
+
+          {/* Auto-select proxy */}
+          <button
             onClick={async () => {
+              if (isAutoSelecting) return
               setIsAutoSelecting(true)
               try {
                 const res = await runAutoSelectProxy()
-                if (!res.success) {
-                  toast.warning(res.message || t('autoSelect.noCandidates', 'Нет доступных серверов'))
-                  return
-                }
-                const switched = res.results.filter((r) => r.switched)
-                if (switched.length > 0) {
-                  switched.forEach((r) => {
-                    toast.success(
-                      t('autoSelect.switchedToast', {
-                        group: r.group,
-                        proxy: r.current,
-                        delay: r.delay,
-                        defaultValue: `Группа [${r.group}]: выбран ${r.current} (${r.delay} мс)`
-                      })
-                    )
-                  })
-                } else if (res.results[0]) {
-                  toast.info(
-                    t('autoSelect.alreadyOptimal', {
-                      proxy: res.results[0].current,
-                      delay: res.results[0].delay,
-                      defaultValue: `Сервер [${res.results[0].current}] уже оптимален (${res.results[0].delay} мс)`
-                    })
-                  )
+                if (res.success) {
+                  toast.success('Автовыбор наилучшего узла завершён')
                 }
               } catch (e) {
                 toast.error(`${e}`)
@@ -600,48 +306,85 @@ const Proxies: React.FC = () => {
                 mutate()
               }
             }}
+            title="Автовыбор сервера с минимальным пингом"
+            className="pm-btn flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg cursor-pointer hover:border-emerald-500/40"
           >
-            {isAutoSelecting ? <Spinner className="size-4" /> : <Sparkles className="text-lg text-amber-500" />}
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="app-nodrag"
-            title={t('pages.proxies.proxyGroupSettings')}
+            <Sparkles className="size-3.5 text-emerald-400" />
+          </button>
+
+          {/* Settings modal */}
+          <button
             onClick={() => setIsSettingModalOpen(true)}
+            title="Настройки отображения прокси"
+            className="pm-btn flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg cursor-pointer hover:border-white/30"
           >
-            <SlidersHorizontal className="text-lg" />
-          </Button>
-        </>
-      }
-    >
-      {isSettingModalOpen && <ProxySettingModal onClose={() => setIsSettingModalOpen(false)} />}
-      {mode === 'direct' ? (
-        <div className="h-full w-full flex justify-center items-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="rounded-full bg-muted p-6">
-              <ChevronsRight className="text-muted-foreground text-5xl" />
-            </div>
-            <h2 className="text-muted-foreground text-lg font-medium">{t('sider.directMode')}</h2>
-          </div>
+            <SlidersHorizontal className="size-3.5" />
+          </button>
         </div>
-      ) : (
-        <div ref={scrollContainerRef} className="h-[calc(100vh-58px)]">
-          <GroupedVirtuoso
-            ref={virtuosoRef}
-            groupCounts={groupCounts}
-            groupContent={groupContent}
-            itemContent={itemContent}
-            isScrolling={(scrolling) => {
-              if (scrolling && !hasScrolledRef.current) {
-                hasScrolledRef.current = true
-                scrollContainerRef.current?.setAttribute('data-scrolled', '')
-              }
-            }}
-          />
+      </div>
+
+      {/* Multiple Groups Tab Pill Bar (if more than 1 group exists) */}
+      {groups.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+          {groups.map((group, idx) => {
+            const isGroupActive = idx === validIndex
+            return (
+              <button
+                key={group.name}
+                onClick={() => setActiveGroupIndex(idx)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all border whitespace-nowrap flex items-center gap-2',
+                  isGroupActive
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                    : 'bg-white/[0.03] border-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]'
+                )}
+              >
+                <span>{group.name}</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/5 border border-white/10 opacity-70">
+                  {group.all?.length || 0}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
-    </BasePage>
+
+      {/* 3D Perspective Tilt Card Grid with Smooth Motion Layout Transitions */}
+      {filteredProxies.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center border border-white/[0.06] rounded-xl bg-card/20">
+          <p className="text-sm text-muted-foreground">Серверы не найдены</p>
+        </div>
+      ) : (
+        <motion.div layout className="servers-grid">
+          <AnimatePresence mode="popLayout">
+            {filteredProxies.map((proxy) => (
+              <motion.div
+                key={proxy.name}
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{
+                  layout: { type: 'spring', damping: 25, stiffness: 220 },
+                  opacity: { duration: 0.2 }
+                }}
+              >
+                <ProxyItem
+                  mutateProxies={mutate}
+                  onProxyDelay={onProxyDelay}
+                  onSelect={onChangeProxy}
+                  proxy={proxy}
+                  group={currentGroup}
+                  selected={proxy.name === currentActiveName}
+                  isGroupDelaying={delayingProxiesRef.current.has(proxy.name)}
+                  reliability={serverMetrics[proxy.name]?.reliability}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </div>
   )
 }
 
