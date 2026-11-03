@@ -40,8 +40,10 @@ export async function checkUpdate(): Promise<AppVersion | undefined> {
 
 export async function downloadAndInstallUpdate(version: string): Promise<void> {
   const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
-  const releaseTag = version
-  const baseUrl = `https://github.com/zwanter/uzurnet/releases/download/${releaseTag}/`
+  let releaseTag = version
+  if (version.includes('beta')) {
+    releaseTag = 'pre-release'
+  }
   const fileMap = {
     'win32-x64': `UzurNet_x64-setup.exe`,
     'win32-arm64': `UzurNet_arm64-setup.exe`,
@@ -57,7 +59,6 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
   }
   downloadCancelToken = axios.CancelToken.source()
 
-  const apiUrl = `https://api.github.com/repos/zwanter/uzurnet/releases/tags/${releaseTag}`
   const apiRequestConfig: AxiosRequestConfig = {
     headers: { Accept: 'application/vnd.github.v3+json' },
     ...(mixedPort != 0 && {
@@ -77,8 +78,30 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
     })
     mainWindow?.setProgressBar(0)
 
-    const releaseRes = await axios.get(apiUrl, apiRequestConfig)
-    const assets: Array<{ name: string; digest?: string }> = releaseRes.data.assets || []
+    // Try primary tag (e.g. 1.6.2 or v1.6.2) and fallback if 404
+    let releaseRes: AxiosResponse
+    const candidateTags = [releaseTag, releaseTag.startsWith('v') ? releaseTag.slice(1) : `v${releaseTag}`]
+    let lastError: unknown
+
+    for (const tag of candidateTags) {
+      try {
+        const apiUrl = `https://api.github.com/repos/zwanter/uzurnet/releases/tags/${tag}`
+        releaseRes = await axios.get(apiUrl, apiRequestConfig)
+        break
+      } catch (err) {
+        lastError = err
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          continue
+        }
+        throw err
+      }
+    }
+
+    if (!releaseRes!) {
+      throw lastError || new Error(`Release not found for ${releaseTag}`)
+    }
+
+    const assets: Array<{ name: string; digest?: string; browser_download_url?: string }> = releaseRes.data.assets || []
     let matchedAsset = assets.find((a) => a.name === file)
     if (!matchedAsset) {
       // Backward-compatibility: fallback to legacy Koala.Clash naming
@@ -93,9 +116,10 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
       throw new Error(`${t('error.sha256NotFound')}: "${file}"`)
     }
     const expectedHash = matchedAsset.digest.split(':')[1].toLowerCase()
+    const downloadUrl = matchedAsset.browser_download_url || `https://github.com/zwanter/uzurnet/releases/download/${releaseTag}/${file}`
 
     if (!existsSync(path.join(dataDir(), file))) {
-      const res = await axios.get(`${baseUrl}${file}`, {
+      const res = await axios.get(downloadUrl, {
         responseType: 'arraybuffer',
         ...(mixedPort != 0 && {
           proxy: {
