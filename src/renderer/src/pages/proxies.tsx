@@ -235,7 +235,9 @@ const Proxies: React.FC = () => {
   }
 
   const currentActiveName =
-    optimisticSelection?.group === currentGroup?.name ? optimisticSelection.proxy : currentGroup?.now
+    optimisticSelection && currentGroup?.name && optimisticSelection.group === currentGroup.name
+      ? optimisticSelection.proxy
+      : currentGroup?.now
 
   return (
     <div className="page-tab-content active-page w-full flex flex-col gap-5 select-none">
