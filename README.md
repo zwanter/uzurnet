@@ -7,7 +7,7 @@
     <img src="https://img.shields.io/badge/Platform-Windows%2011-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows 11" />
     <img src="https://img.shields.io/badge/Core-Mihomo-10B981?style=flat-square" alt="Mihomo Core" />
     <img src="https://img.shields.io/badge/UI-Fluent%20Acrylic-06B6D4?style=flat-square" alt="Fluent Design" />
-    <img src="https://img.shields.io/badge/Version-v1.6.0-emerald?style=flat-square" alt="Version" />
+    <a href="https://github.com/zwanter/uzurnet/releases"><img src="https://img.shields.io/github/v/release/zwanter/uzurnet?style=flat-square&color=emerald&label=Version" alt="Version" /></a>
     <img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" alt="License" />
   </p>
 </div>
