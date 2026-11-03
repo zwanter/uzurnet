@@ -301,7 +301,7 @@ const App: React.FC = () => {
             </div>
             <div className="titlebar-text">
               <span>UzurNet</span>
-              <span className="version-tag">{appVer ? `v${appVer}` : 'v1.6.1'}</span>
+              <span className="version-tag">{appVer ? `v${appVer}` : 'v1.6.2'}</span>
             </div>
             <div className="status-pill">
               <span className="live-dot" />

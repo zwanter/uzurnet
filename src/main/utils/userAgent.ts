@@ -7,5 +7,5 @@ export async function getUserAgent(): Promise<string> {
     return userAgent
   }
 
-  return `uzurnet/${version}`
+  return `clash.meta/uzurnet-${version}`
 }

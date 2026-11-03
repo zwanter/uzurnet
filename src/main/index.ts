@@ -436,8 +436,12 @@ async function showProfileInstallConfirm(url: string, name?: string | null): Pro
   if (!extractedName) {
     try {
       const axios = (await import('axios')).default
+      const { getUserAgent } = await import('./utils/userAgent')
       const response = await axios.head(url, {
-        timeout: 5000
+        timeout: 5000,
+        headers: {
+          'User-Agent': await getUserAgent()
+        }
       })
 
       if (response.headers['profile-title']) {
