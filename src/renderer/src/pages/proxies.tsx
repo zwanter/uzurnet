@@ -9,7 +9,8 @@ import {
   mihomoCloseAllConnections,
   mihomoProxyDelay,
   runAutoSelectProxy,
-  getServerMetrics
+  getServerMetrics,
+  ServerMetricItem
 } from '@renderer/utils/ipc'
 import { includesIgnoreCase } from '@renderer/utils/includes'
 import ProxyItem from '@renderer/components/proxies/proxy-item'
@@ -49,7 +50,7 @@ const Proxies: React.FC = () => {
   const [sortByDelay, setSortByDelay] = useState(true)
 
   // Reliability metrics map from backend
-  const [serverMetrics, setServerMetrics] = useState<Record<string, { reliability: number; emaDelay: number }>>({})
+  const [serverMetrics, setServerMetrics] = useState<Record<string, ServerMetricItem>>({})
 
   // Optimistic UI state for active proxy selection
   const [optimisticSelection, setOptimisticSelection] = useState<{ group: string; proxy: string } | null>(null)
@@ -65,7 +66,7 @@ const Proxies: React.FC = () => {
       })
       .catch(() => {})
 
-    const handleMetricsUpdated = (_e: unknown, metrics: Record<string, { reliability: number; emaDelay: number }>): void => {
+    const handleMetricsUpdated = (_e: unknown, metrics: Record<string, ServerMetricItem>): void => {
       if (metrics) setServerMetrics(metrics)
     }
 
@@ -180,8 +181,14 @@ const Proxies: React.FC = () => {
 
     if (sortByDelay || proxyDisplayOrder === 'delay') {
       list = [...list].sort((a, b) => {
-        const aDelay = a.history && a.history.length > 0 ? a.history[a.history.length - 1].delay : -1
-        const bDelay = b.history && b.history.length > 0 ? b.history[b.history.length - 1].delay : -1
+        const aHist = a.history && a.history.length > 0 ? a.history[a.history.length - 1].delay : undefined
+        const bHist = b.history && b.history.length > 0 ? b.history[b.history.length - 1].delay : undefined
+
+        const aMetric = serverMetrics[a.name]
+        const bMetric = serverMetrics[b.name]
+
+        const aDelay = aHist !== undefined ? aHist : (aMetric?.lastDelay ?? aMetric?.emaDelay ?? -1)
+        const bDelay = bHist !== undefined ? bHist : (bMetric?.lastDelay ?? bMetric?.emaDelay ?? -1)
 
         // 1. Untested (-1) and Timeouts (0) go to the very bottom
         const aValid = aDelay > 0
@@ -378,6 +385,7 @@ const Proxies: React.FC = () => {
                   selected={proxy.name === currentActiveName}
                   isGroupDelaying={delayingProxiesRef.current.has(proxy.name)}
                   reliability={serverMetrics[proxy.name]?.reliability}
+                  cachedDelay={serverMetrics[proxy.name]?.lastDelay}
                 />
               </motion.div>
             ))}

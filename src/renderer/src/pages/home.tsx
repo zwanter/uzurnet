@@ -7,7 +7,9 @@ import {
   triggerSysProxy,
   updateTrayIcon,
   mihomoHotReloadConfig,
-  mihomoChangeProxy
+  mihomoChangeProxy,
+  getServerMetrics,
+  ServerMetricItem
 } from '@renderer/utils/ipc'
 import { useTranslation } from 'react-i18next'
 import { memo, useEffect, useMemo, useState } from 'react'
@@ -22,7 +24,8 @@ import {
   CreditCard,
   Zap,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck
 } from 'lucide-react'
 import { SiTelegram } from 'react-icons/si'
 import EditInfoModal from '@renderer/components/profiles/edit-info-modal'
@@ -101,6 +104,27 @@ const Home: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingItem, setEditingItem] = useState<ProfileItem | null>(null)
   const [updating, setUpdating] = useState(false)
+  const [serverMetrics, setServerMetrics] = useState<Record<string, ServerMetricItem>>({})
+
+  useEffect(() => {
+    getServerMetrics()
+      .then((m) => {
+        if (m) setServerMetrics(m)
+      })
+      .catch(() => {})
+
+    const handleMetricsUpdated = (
+      _e: unknown,
+      metrics: Record<string, ServerMetricItem>
+    ): void => {
+      if (metrics) setServerMetrics(metrics)
+    }
+
+    window.electron.ipcRenderer.on('serverMetricsUpdated', handleMetricsUpdated)
+    return () => {
+      window.electron.ipcRenderer.removeListener('serverMetricsUpdated', handleMetricsUpdated)
+    }
+  }, [])
 
   const handleAddProfile = (): void => {
     const newProfile: ProfileItem = {
@@ -265,28 +289,31 @@ const Home: React.FC = () => {
         const nodeName = typeof item === 'string' ? item : typeof item?.name === 'string' ? item.name : String(item || '')
         const { countryCode, displayName } = parseServerNode(nodeName)
         const itemDelay = Array.isArray(item?.history) && item.history.length > 0 ? item.history[item.history.length - 1]?.delay : 0
-        const pingVal = itemDelay > 0 ? itemDelay : Math.floor(25 + Math.random() * 45)
         const itemType = item?.type || 'VLESS'
+        const metric = serverMetrics[nodeName]
+        const pingVal = itemDelay > 0 ? itemDelay : (metric?.lastDelay && metric.lastDelay > 0 ? metric.lastDelay : (metric?.emaDelay || Math.floor(25 + Math.random() * 45)))
+        const reliability = metric?.reliability ?? (itemDelay > 0 ? 99 : 95)
         return {
           id: nodeName,
           name: displayName,
           rawName: nodeName,
           countryCode,
           ping: pingVal,
+          reliability,
           active: firstGroup.now === nodeName,
           badges: [itemType]
         }
       })
     }
     return [
-      { id: 'nl-04', countryCode: 'NL', name: 'Amsterdam — Ultra Fast 04', rawName: 'Amsterdam-04', ping: 34, badges: ['VLESS'], active: true },
-      { id: 'de-02', countryCode: 'DE', name: 'Frankfurt — Cloud Core 02', rawName: 'Frankfurt-02', ping: 41, badges: ['Hysteria 2'], active: false },
-      { id: 'fi-01', countryCode: 'FI', name: 'Helsinki — Direct Light 01', rawName: 'Helsinki-01', ping: 47, badges: ['Shadowsocks'], active: false },
-      { id: 'se-03', countryCode: 'SE', name: 'Stockholm — Nordic Stream 03', rawName: 'Stockholm-03', ping: 53, badges: ['VLESS'], active: false },
-      { id: 'ee-01', countryCode: 'EE', name: 'Tallinn — Enterprise Node', rawName: 'Tallinn-01', ping: 28, badges: ['VLESS'], active: false },
-      { id: 'pl-01', countryCode: 'PL', name: 'Warsaw — Core 01', rawName: 'Warsaw-01', ping: 59, badges: ['TUIC v5'], active: false }
+      { id: 'nl-04', countryCode: 'NL', name: 'Amsterdam — Ultra Fast 04', rawName: 'Amsterdam-04', ping: 34, reliability: 99, badges: ['VLESS'], active: true },
+      { id: 'de-02', countryCode: 'DE', name: 'Frankfurt — Cloud Core 02', rawName: 'Frankfurt-02', ping: 41, reliability: 98, badges: ['Hysteria 2'], active: false },
+      { id: 'fi-01', countryCode: 'FI', name: 'Helsinki — Direct Light 01', rawName: 'Helsinki-01', ping: 47, reliability: 96, badges: ['Shadowsocks'], active: false },
+      { id: 'se-03', countryCode: 'SE', name: 'Stockholm — Nordic Stream 03', rawName: 'Stockholm-03', ping: 53, reliability: 97, badges: ['VLESS'], active: false },
+      { id: 'ee-01', countryCode: 'EE', name: 'Tallinn — Enterprise Node', rawName: 'Tallinn-01', ping: 28, reliability: 99, badges: ['VLESS'], active: false },
+      { id: 'pl-01', countryCode: 'PL', name: 'Warsaw — Core 01', rawName: 'Warsaw-01', ping: 59, reliability: 95, badges: ['TUIC v5'], active: false }
     ]
-  }, [firstGroup])
+  }, [firstGroup, serverMetrics])
 
   if (!hasProfiles) {
     return (
@@ -489,7 +516,7 @@ const Home: React.FC = () => {
                 )}
               </span>
             </div>
-            <div className="server-tags flex gap-1.5 mt-2">
+            <div className="server-tags flex items-center gap-1.5 mt-2 flex-wrap">
               {s.badges.map((b) => (
                 <span key={b} className="srv-badge font-mono text-[10px] px-2 py-0.5 rounded">
                   {b}
@@ -497,6 +524,22 @@ const Home: React.FC = () => {
               ))}
               {s.ping > 0 && s.ping < 120 && (
                 <span className="srv-badge fast text-[10px] px-2 py-0.5 rounded">Быстрый</span>
+              )}
+              {s.reliability !== undefined && (
+                <span
+                  title={`Рейтинг надёжности и аптайма узла: ${s.reliability}%`}
+                  className={cn(
+                    'srv-badge font-mono text-[10px] px-2 py-0.5 rounded flex items-center gap-1',
+                    s.reliability >= 85
+                      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25'
+                      : s.reliability >= 60
+                        ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25'
+                        : 'text-amber-400 bg-amber-500/10 border-amber-500/25'
+                  )}
+                >
+                  <ShieldCheck className="size-2.5" />
+                  <span>{s.reliability}%</span>
+                </span>
               )}
             </div>
           </div>

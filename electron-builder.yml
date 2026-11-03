@@ -64,7 +64,7 @@ linux:
     - deb
     - rpm
     - pacman
-  maintainer: coolcoala
+  maintainer: zwanter
   category: Utility
   artifactName: UzurNet_${arch}.${ext}
 deb:

@@ -17,7 +17,7 @@ let downloadCancelToken: CancelTokenSource | null = null
 
 export async function checkUpdate(): Promise<AppVersion | undefined> {
   const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
-  const url = 'https://github.com/zwanter/koala-clash/releases/latest/download/latest.yml'
+  const url = 'https://github.com/zwanter/uzurnet/releases/latest/download/latest.yml'
   const res = await axios.get(url, {
     headers: { 'Content-Type': 'application/octet-stream' },
     ...(mixedPort != 0 && {
@@ -41,7 +41,7 @@ export async function checkUpdate(): Promise<AppVersion | undefined> {
 export async function downloadAndInstallUpdate(version: string): Promise<void> {
   const { 'mixed-port': mixedPort = 0 } = (await getRuntimeConfig()) ?? {}
   const releaseTag = version
-  const baseUrl = `https://github.com/zwanter/koala-clash/releases/download/${releaseTag}/`
+  const baseUrl = `https://github.com/zwanter/uzurnet/releases/download/${releaseTag}/`
   const fileMap = {
     'win32-x64': `UzurNet_x64-setup.exe`,
     'win32-arm64': `UzurNet_arm64-setup.exe`,
@@ -57,7 +57,7 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
   }
   downloadCancelToken = axios.CancelToken.source()
 
-  const apiUrl = `https://api.github.com/repos/zwanter/koala-clash/releases/tags/${releaseTag}`
+  const apiUrl = `https://api.github.com/repos/zwanter/uzurnet/releases/tags/${releaseTag}`
   const apiRequestConfig: AxiosRequestConfig = {
     headers: { Accept: 'application/vnd.github.v3+json' },
     ...(mixedPort != 0 && {

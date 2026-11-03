@@ -1,5 +1,11 @@
 import { app, ipcMain } from 'electron'
-import { runAutoSelect, restartAutoSelectTimer, getServerMetrics } from '../resolve/autoSelector'
+import {
+  runAutoSelect,
+  restartAutoSelectTimer,
+  getServerMetrics,
+  updateServerSample,
+  recordBatchServerSamples
+} from '../resolve/autoSelector'
 import {
   mihomoChangeProxy,
   mihomoCloseAllConnections,
@@ -115,6 +121,7 @@ import { declineElevation, ELEVATION_DECLINED_ARG } from './elevation'
 import { safeSend } from './safeSend'
 import { logDir } from './dirs'
 import path from 'path'
+import { exec } from 'child_process'
 import v8 from 'v8'
 import { getIconDataURL, getImageDataURL } from './icon'
 import { closeFloatingWindow, showContextMenu, showFloatingWindow } from '../resolve/floatingWindow'
@@ -145,6 +152,61 @@ function ipcErrorWrapper<T>( // eslint-disable-next-line @typescript-eslint/no-e
     }
   }
 }
+export async function getRunningProcesses(): Promise<Array<{ processName: string; processPath: string }>> {
+  if (process.platform === 'win32') {
+    return new Promise((resolve) => {
+      const cmd = `powershell -NoProfile -NonInteractive -Command "Get-Process | Where-Object { $_.Path -and ($_.MainWindowTitle -or $_.SessionId -gt 0) } | Select-Object -Unique Path, ProcessName | ConvertTo-Json -Compress"`
+      exec(cmd, { windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        if (err || !stdout.trim()) {
+          resolve([])
+          return
+        }
+        try {
+          const parsed = JSON.parse(stdout.trim())
+          const list = Array.isArray(parsed) ? parsed : [parsed]
+          const seen = new Set<string>()
+          const result: Array<{ processName: string; processPath: string }> = []
+          for (const p of list) {
+            if (p && p.Path) {
+              const procName = path.basename(p.Path)
+              const key = procName.toLowerCase()
+              if (!seen.has(key)) {
+                seen.add(key)
+                result.push({
+                  processName: procName,
+                  processPath: p.Path
+                })
+              }
+            }
+          }
+          resolve(result)
+        } catch {
+          resolve([])
+        }
+      })
+    })
+  } else if (process.platform === 'darwin') {
+    return new Promise((resolve) => {
+      exec(`ps -axo comm | grep '\\.app/'`, { maxBuffer: 5 * 1024 * 1024 }, (_err, stdout) => {
+        const lines = (stdout || '').split('\n').filter(Boolean)
+        const seen = new Set<string>()
+        const result: Array<{ processName: string; processPath: string }> = []
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          const procName = path.basename(trimmed)
+          if (!seen.has(procName.toLowerCase())) {
+            seen.add(procName.toLowerCase())
+            result.push({ processName: procName, processPath: trimmed })
+          }
+        }
+        resolve(result)
+      })
+    })
+  }
+  return []
+}
+
 export function registerIpcMainHandlers(): void {
   ipcMain.handle('mihomoVersion', ipcErrorWrapper(mihomoVersion))
   ipcMain.handle('mihomoConfig', ipcErrorWrapper(mihomoConfig))
@@ -172,12 +234,25 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('mihomoUpgrade', ipcErrorWrapper(mihomoUpgrade))
   ipcMain.handle('mihomoHotReloadConfig', ipcErrorWrapper(mihomoHotReloadConfig))
   ipcMain.handle('mihomoApplyLogLevel', ipcErrorWrapper(mihomoApplyLogLevel))
-  ipcMain.handle('mihomoProxyDelay', (_e, proxy, url, provider) =>
-    ipcErrorWrapper(mihomoProxyDelay)(proxy, url, provider)
-  )
-  ipcMain.handle('mihomoGroupDelay', (_e, group, url) =>
-    ipcErrorWrapper(mihomoGroupDelay)(group, url)
-  )
+  ipcMain.handle('mihomoProxyDelay', async (_e, proxy, url, provider) => {
+    const res = await ipcErrorWrapper(mihomoProxyDelay)(proxy, url, provider)
+    if (res && typeof res === 'object' && !('invokeError' in res)) {
+      const delay = (res as any)?.delay ?? 0
+      updateServerSample(proxy, delay)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const metrics = await getServerMetrics()
+        mainWindow.webContents.send('serverMetricsUpdated', metrics)
+      }
+    }
+    return res
+  })
+  ipcMain.handle('mihomoGroupDelay', async (_e, group, url) => {
+    const res = await ipcErrorWrapper(mihomoGroupDelay)(group, url)
+    if (res && typeof res === 'object' && !('invokeError' in res)) {
+      recordBatchServerSamples(res as Record<string, number>)
+    }
+    return res
+  })
   ipcMain.handle('patchMihomoConfig', (_e, patch) => ipcErrorWrapper(patchMihomoConfig)(patch))
   ipcMain.handle('checkAutoRun', ipcErrorWrapper(checkAutoRun))
   ipcMain.handle('enableAutoRun', ipcErrorWrapper(enableAutoRun))
@@ -297,6 +372,7 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('getAppName', (_e, appPath) => ipcErrorWrapper(getAppName)(appPath))
   ipcMain.handle('getImageDataURL', (_e, url) => ipcErrorWrapper(getImageDataURL)(url))
   ipcMain.handle('getIconDataURL', (_e, appPath) => ipcErrorWrapper(getIconDataURL)(appPath))
+  ipcMain.handle('getRunningProcesses', () => ipcErrorWrapper(getRunningProcesses)())
   ipcMain.handle('resolveThemes', () => ipcErrorWrapper(resolveThemes)())
   ipcMain.handle('fetchThemes', () => ipcErrorWrapper(fetchThemes)())
   ipcMain.handle('importThemes', (_e, file) => ipcErrorWrapper(importThemes)(file))
@@ -305,7 +381,7 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('applyTheme', (_e, theme) => ipcErrorWrapper(applyTheme)(theme))
   ipcMain.handle('copyEnv', (_e, type) => ipcErrorWrapper(copyEnv)(type))
   ipcMain.handle('alert', (_e, msg) => {
-    showError('Koala Clash', msg)
+    showError('UzurNet', msg)
   })
   ipcMain.handle('resetAppConfig', resetAppConfig)
   ipcMain.handle('relaunchApp', () => {

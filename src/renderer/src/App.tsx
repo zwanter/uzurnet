@@ -296,12 +296,12 @@ const App: React.FC = () => {
       {platform === 'win32' && !appConfig?.useWindowFrame && (
         <header className="titlebar shrink-0 app-drag relative z-50">
           <div className="titlebar-brand">
-            <div className="koala-icon flex items-center justify-center">
+            <div className="uzurnet-icon flex items-center justify-center">
               <UzurNetLogo className="size-4.5" />
             </div>
             <div className="titlebar-text">
               <span>UzurNet</span>
-              <span className="version-tag">{appVer ? `v${appVer}` : 'v1.6.0'}</span>
+              <span className="version-tag">{appVer ? `v${appVer}` : 'v1.6.1'}</span>
             </div>
             <div className="status-pill">
               <span className="live-dot" />

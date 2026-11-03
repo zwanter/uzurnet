@@ -470,6 +470,10 @@ export async function getIconDataURL(appPath: string): Promise<string> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getIconDataURL', appPath))
 }
 
+export async function getRunningProcesses(): Promise<Array<{ processName: string; processPath: string }>> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getRunningProcesses'))
+}
+
 export async function resolveThemes(): Promise<{ key: string; label: string; content: string }[]> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('resolveThemes'))
 }
@@ -550,20 +554,17 @@ export async function runAutoSelectProxy(): Promise<{
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('runAutoSelectProxy'))
 }
 
-export async function getServerMetrics(): Promise<
-  Record<
-    string,
-    {
-      name: string
-      emaDelay: number
-      lastDelay: number
-      successCount: number
-      failCount: number
-      reliability: number
-      lastTested: number
-    }
-  >
-> {
+export interface ServerMetricItem {
+  name: string
+  emaDelay: number
+  lastDelay: number
+  successCount: number
+  failCount: number
+  reliability: number
+  lastTested: number
+}
+
+export async function getServerMetrics(): Promise<Record<string, ServerMetricItem>> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getServerMetrics'))
 }
 

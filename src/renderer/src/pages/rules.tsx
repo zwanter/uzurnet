@@ -1,6 +1,7 @@
 import BasePage from '@renderer/components/base/base-page'
 import RuleItem from '@renderer/components/rules/rule-item'
 import EditRulesModal from '@renderer/components/profiles/edit-rules-modal'
+import ProcessRuleDialog from '@renderer/components/rules/process-rule-dialog'
 import { Virtuoso } from 'react-virtuoso'
 import { useMemo, useState } from 'react'
 import { Separator } from '@renderer/components/ui/separator'
@@ -11,7 +12,7 @@ import { useProfileConfig } from '@renderer/hooks/use-profile-config'
 import { includesIgnoreCase } from '@renderer/utils/includes'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Database, Pencil } from 'lucide-react'
+import { Database, Pencil, AppWindow } from 'lucide-react'
 
 const Rules: React.FC = () => {
   const { t } = useTranslation()
@@ -19,6 +20,7 @@ const Rules: React.FC = () => {
   const { profileConfig } = useProfileConfig()
   const [filter, setFilter] = useState('')
   const [showRulesEditor, setShowRulesEditor] = useState(false)
+  const [showProcessPicker, setShowProcessPicker] = useState(false)
   const navigate = useNavigate()
 
   const filteredRules = useMemo(() => {
@@ -39,15 +41,27 @@ const Rules: React.FC = () => {
       header={
         <>
           {profileConfig?.current && (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="app-nodrag"
-              title={t('profile.editRule')}
-              onClick={() => setShowRulesEditor(true)}
-            >
-              <Pencil className="size-4" />
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="app-nodrag flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                title="Добавить правило для запущенного приложения"
+                onClick={() => setShowProcessPicker(true)}
+              >
+                <AppWindow className="size-3.5" />
+                <span>Правило для приложения</span>
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="app-nodrag"
+                title={t('profile.editRule')}
+                onClick={() => setShowRulesEditor(true)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </>
           )}
           <Button
             size="icon-sm"
@@ -61,6 +75,13 @@ const Rules: React.FC = () => {
         </>
       }
     >
+      {showProcessPicker && profileConfig?.current && (
+        <ProcessRuleDialog
+          open={showProcessPicker}
+          onOpenChange={setShowProcessPicker}
+          profileId={profileConfig.current}
+        />
+      )}
       {showRulesEditor && profileConfig?.current && (
         <EditRulesModal
           id={profileConfig.current}

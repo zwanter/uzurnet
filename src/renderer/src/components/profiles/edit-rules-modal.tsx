@@ -68,8 +68,10 @@ import {
   GripVertical,
   Trash2,
   Undo2,
-  XIcon
+  XIcon,
+  AppWindow
 } from 'lucide-react'
+import ProcessRuleDialog from '@renderer/components/rules/process-rule-dialog'
 import React, {
   useEffect,
   useState,
@@ -1143,6 +1145,7 @@ const EditRulesModal: React.FC<Props> = (props) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingRule, setEditingRule] = useState<RuleItem | null>(null)
   const [newRuleProxyOpen, setNewRuleProxyOpen] = useState(false)
+  const [showProcessDialog, setShowProcessDialog] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeDragSize, setActiveDragSize] = useState<{ width: number; height: number } | null>(
     null
@@ -1813,6 +1816,17 @@ const EditRulesModal: React.FC<Props> = (props) => {
             {/* Left panel - Rule form */}
             <div className="w-2/5 flex flex-col gap-3 pr-1 overflow-y-auto min-h-0">
               <div className="flex flex-col gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowProcessDialog(true)}
+                  className="w-full h-8 text-xs font-medium flex items-center justify-center gap-2 border-emerald-500/30 text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15"
+                >
+                  <AppWindow className="size-3.5" />
+                  <span>Выбрать запущенный процесс...</span>
+                </Button>
+
                 <div className="flex flex-col gap-1.5">
                   <Label>{t('profile.editRules.ruleType')}</Label>
                   <Select
@@ -2138,6 +2152,41 @@ const EditRulesModal: React.FC<Props> = (props) => {
           </Button>
         </DialogFooter>
       </DialogContent>
+      {showProcessDialog && (
+        <ProcessRuleDialog
+          open={showProcessDialog}
+          onOpenChange={setShowProcessDialog}
+          profileId={id}
+          proxyGroups={proxyGroups}
+          onRuleCreated={(created) => {
+            setNewRule({
+              type: 'PROCESS-NAME',
+              payload: created.payload,
+              proxy: created.proxy,
+              additionalParams: []
+            })
+            const ruleToInsert = parseRuleStringToItem(`PROCESS-NAME,${created.payload},${created.proxy}`)
+            if (created.position === 'prepend') {
+              setRules((prev) => [ruleToInsert, ...prev])
+              setPrependRules((prev) => {
+                const next = new Set<number>()
+                prev.forEach((idx) => next.add(idx + 1))
+                next.add(0)
+                return next
+              })
+              toast.success(`Правило для ${created.payload} (${created.proxy}) добавлено в начало`)
+            } else {
+              setRules((prev) => [...prev, ruleToInsert])
+              setAppendRules((prev) => {
+                const next = new Set(prev)
+                next.add(rules.length)
+                return next
+              })
+              toast.success(`Правило для ${created.payload} (${created.proxy}) добавлено в конец`)
+            }
+          }}
+        />
+      )}
     </Dialog>
   )
 }

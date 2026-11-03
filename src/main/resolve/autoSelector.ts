@@ -1,4 +1,7 @@
 import https from 'https'
+import fs from 'fs'
+import path from 'path'
+import { dataDir } from '../utils/dirs'
 import { getAppConfig } from '../config/app'
 import {
   mihomoGroups,
@@ -29,7 +32,68 @@ export interface ServerMetric {
 
 const serverMetricsMap = new Map<string, ServerMetric>()
 
+let metricsLoaded = false
+let saveMetricsTimer: NodeJS.Timeout | null = null
+
+export function loadServerMetricsFromDisk(): void {
+  try {
+    const file = path.join(dataDir(), 'server-metrics.json')
+    if (fs.existsSync(file)) {
+      const data = fs.readFileSync(file, 'utf-8')
+      const parsed = JSON.parse(data)
+      if (parsed && typeof parsed === 'object') {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v && typeof v === 'object' && typeof (v as any).reliability === 'number') {
+            serverMetricsMap.set(k, v as ServerMetric)
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  } finally {
+    metricsLoaded = true
+  }
+}
+
+export async function persistServerMetricsToDisk(): Promise<void> {
+  try {
+    const dir = dataDir()
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    const file = path.join(dir, 'server-metrics.json')
+    const obj: Record<string, ServerMetric> = {}
+    for (const [k, v] of serverMetricsMap.entries()) {
+      obj[k] = v
+    }
+    const tempFile = `${file}.tmp`
+    await fs.promises.writeFile(tempFile, JSON.stringify(obj, null, 2), 'utf-8')
+    if (process.platform === 'win32' && fs.existsSync(file)) {
+      try {
+        await fs.promises.unlink(file)
+      } catch {
+        // ignore
+      }
+    }
+    await fs.promises.rename(tempFile, file)
+  } catch {
+    // ignore
+  }
+}
+
+function scheduleSaveMetrics(): void {
+  if (saveMetricsTimer) return
+  saveMetricsTimer = setTimeout(() => {
+    saveMetricsTimer = null
+    void persistServerMetricsToDisk()
+  }, 1000)
+}
+
 export async function getServerMetrics(): Promise<Record<string, ServerMetric>> {
+  if (!metricsLoaded) {
+    loadServerMetricsFromDisk()
+  }
   const result: Record<string, ServerMetric> = {}
   for (const [key, value] of serverMetricsMap.entries()) {
     result[key] = { ...value }
@@ -37,7 +101,10 @@ export async function getServerMetrics(): Promise<Record<string, ServerMetric>> 
   return result
 }
 
-function updateServerSample(name: string, delay: number): ServerMetric {
+export function updateServerSample(name: string, delay: number): ServerMetric {
+  if (!metricsLoaded) {
+    loadServerMetricsFromDisk()
+  }
   let m = serverMetricsMap.get(name)
   if (!m) {
     m = {
@@ -75,7 +142,57 @@ function updateServerSample(name: string, delay: number): ServerMetric {
   }
 
   serverMetricsMap.set(name, m)
+  scheduleSaveMetrics()
   return m
+}
+
+export function recordBatchServerSamples(samples: Record<string, number>): void {
+  if (!metricsLoaded) {
+    loadServerMetricsFromDisk()
+  }
+  for (const [name, delay] of Object.entries(samples)) {
+    if (name && typeof delay === 'number') {
+      let m = serverMetricsMap.get(name)
+      if (!m) {
+        m = {
+          name,
+          emaDelay: delay > 0 ? delay : 500,
+          lastDelay: delay,
+          successCount: delay > 0 ? 1 : 0,
+          failCount: delay === 0 ? 1 : 0,
+          consecutiveWins: 0,
+          reliability: delay > 0 ? 100 : 40,
+          lastTested: Date.now()
+        }
+      } else {
+        m.lastTested = Date.now()
+        m.lastDelay = delay
+        if (delay > 0) {
+          m.successCount++
+          const sample = delay > 1800 && m.emaDelay < 300 ? m.emaDelay * 1.5 : delay
+          m.emaDelay = Math.round(0.35 * sample + 0.65 * m.emaDelay)
+        } else {
+          m.failCount++
+          m.emaDelay = Math.max(m.emaDelay, 500)
+        }
+        const total = m.successCount + m.failCount
+        if (total > 0) {
+          const rawPct = (m.successCount / total) * 100
+          const recentPenalty = m.failCount * 5
+          m.reliability = Math.max(10, Math.min(100, Math.round(rawPct - recentPenalty)))
+        }
+      }
+      serverMetricsMap.set(name, m)
+    }
+  }
+  scheduleSaveMetrics()
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const result: Record<string, ServerMetric> = {}
+    for (const [key, value] of serverMetricsMap.entries()) {
+      result[key] = { ...value }
+    }
+    mainWindow.webContents.send('serverMetricsUpdated', result)
+  }
 }
 
 // Check local direct internet (Baseline check to differentiate home Wi-Fi drops vs server outages)

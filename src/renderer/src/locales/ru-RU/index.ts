@@ -463,7 +463,7 @@ export default {
     pleaseConfirm: 'Подтвердите действие',
     confirmDelete: 'Подтвердить удаление',
     confirmImportProfile: 'Импортировать конфигурацию подписки?',
-    confirmQuit: 'Вы уверены, что хотите выйти из Koala Clash?',
+    confirmQuit: 'Вы уверены, что хотите выйти из UzurNet?',
     quitWarning: 'После выхода прокси перестанет работать',
     quickQuitHint: 'Нажмите дважды или удерживайте кнопку',
     canQuitDirectly: 'для быстрого выхода',
@@ -703,7 +703,7 @@ export default {
       registerTaskSchedule: 'Зарегистрировать задачу'
     },
     serviceModal: {
-      title: 'Управление службой Koala Clash',
+      title: 'Управление службой UzurNet',
       serviceStatus: 'Состояние службы',
       connectionStatus: 'Состояние подключения',
       checking: 'Проверка',
@@ -1018,7 +1018,7 @@ export default {
       'Нажмите на иконку «Главная», чтобы вернуться на главную страницу.',
     supportTitle: 'Поддержка',
     supportDesc: 'Нажмите, чтобы связаться с поддержкой провайдера.',
-    welcome: 'Добро пожаловать в Koala Clash',
+    welcome: 'Добро пожаловать в UzurNet',
     welcomeDesc:
       'Краткое руководство поможет быстро разобраться в приложении. Нажмите «Далее», чтобы начать.',
     navbar: 'Панель навигации',

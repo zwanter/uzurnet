@@ -61,103 +61,85 @@ const ShortcutConfig: React.FC = () => {
   return (
     <SettingCard title={t('settings.shortcuts.title')}>
       <SettingItem title={t('settings.shortcuts.toggleWindow')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={showWindowShortcut}
-            patchAppConfig={patchAppConfig}
-            action="showWindowShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={showWindowShortcut}
+          patchAppConfig={patchAppConfig}
+          action="showWindowShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.toggleFloatingWindow')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={showFloatingWindowShortcut}
-            patchAppConfig={patchAppConfig}
-            action="showFloatingWindowShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={showFloatingWindowShortcut}
+          patchAppConfig={patchAppConfig}
+          action="showFloatingWindowShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.toggleSysProxy')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={triggerSysProxyShortcut}
-            patchAppConfig={patchAppConfig}
-            action="triggerSysProxyShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={triggerSysProxyShortcut}
+          patchAppConfig={patchAppConfig}
+          action="triggerSysProxyShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.toggleTun')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={triggerTunShortcut}
-            patchAppConfig={patchAppConfig}
-            action="triggerTunShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={triggerTunShortcut}
+          patchAppConfig={patchAppConfig}
+          action="triggerTunShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.switchRuleMode')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={ruleModeShortcut}
-            patchAppConfig={patchAppConfig}
-            action="ruleModeShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={ruleModeShortcut}
+          patchAppConfig={patchAppConfig}
+          action="ruleModeShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.switchGlobalMode')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={globalModeShortcut}
-            patchAppConfig={patchAppConfig}
-            action="globalModeShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={globalModeShortcut}
+          patchAppConfig={patchAppConfig}
+          action="globalModeShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.switchDirectMode')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={directModeShortcut}
-            patchAppConfig={patchAppConfig}
-            action="directModeShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={directModeShortcut}
+          patchAppConfig={patchAppConfig}
+          action="directModeShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.quitKeepCore')} divider>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={quitWithoutCoreShortcut}
-            patchAppConfig={patchAppConfig}
-            action="quitWithoutCoreShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={quitWithoutCoreShortcut}
+          patchAppConfig={patchAppConfig}
+          action="quitWithoutCoreShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
       <SettingItem title={t('settings.shortcuts.restartApp')}>
-        <div className="flex justify-end w-[60%]">
-          <ShortcutInput
-            value={restartAppShortcut}
-            patchAppConfig={patchAppConfig}
-            action="restartAppShortcut"
-            activeAction={activeAction}
-            setActiveAction={setActiveAction}
-          />
-        </div>
+        <ShortcutInput
+          value={restartAppShortcut}
+          patchAppConfig={patchAppConfig}
+          action="restartAppShortcut"
+          activeAction={activeAction}
+          setActiveAction={setActiveAction}
+        />
       </SettingItem>
     </SettingCard>
   )
@@ -236,11 +218,11 @@ const ShortcutInput: React.FC<{
     }
   }
   return (
-    <>
+    <div className="flex items-center justify-end gap-2 shrink-0">
       {inputValue !== value && (
         <Button
-          className="mr-2"
           size="sm"
+          className="h-8 px-2.5 text-xs font-medium shrink-0"
           onClick={async () => {
             try {
               if (await registerShortcut(value, inputValue, action)) {
@@ -261,7 +243,7 @@ const ShortcutInput: React.FC<{
         type="button"
         variant="outline"
         size="sm"
-        className={`w-[calc(100%-72px)] h-8 justify-start gap-1 font-normal ${isFocused ? 'ring-2 ring-ring/50 ring-offset-2 ring-offset-background' : ''}`}
+        className={`w-64 h-8 justify-start gap-1 font-normal shrink-0 overflow-hidden text-left ${isFocused ? 'ring-2 ring-ring/50 ring-offset-2 ring-offset-background' : ''}`}
         onKeyDown={(e: KeyboardEvent<HTMLButtonElement>): void => {
           parseShortcut(e, setInputValue)
         }}
@@ -278,12 +260,12 @@ const ShortcutInput: React.FC<{
             ))}
           </KbdGroup>
         ) : (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-xs truncate">
             {t('settings.shortcuts.clickToInput')}
           </span>
         )}
       </Button>
-    </>
+    </div>
   )
 }
 

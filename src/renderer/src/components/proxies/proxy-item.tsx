@@ -18,6 +18,7 @@ interface Props {
   selected: boolean
   isGroupDelaying?: boolean
   reliability?: number
+  cachedDelay?: number
 }
 
 const ProxyItem: React.FC<Props> = React.memo((props) => {
@@ -29,7 +30,8 @@ const ProxyItem: React.FC<Props> = React.memo((props) => {
     onSelect,
     onProxyDelay,
     isGroupDelaying,
-    reliability
+    reliability,
+    cachedDelay
   } = props
 
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -42,8 +44,11 @@ const ProxyItem: React.FC<Props> = React.memo((props) => {
     if (proxy.history && proxy.history.length > 0) {
       return proxy.history[proxy.history.length - 1].delay
     }
+    if (cachedDelay !== undefined && cachedDelay >= 0) {
+      return cachedDelay
+    }
     return -1
-  }, [proxy])
+  }, [proxy, cachedDelay])
 
   const triggerSonarAnimation = useCallback(() => {
     if (animTimerRef.current) clearTimeout(animTimerRef.current)
