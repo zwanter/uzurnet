@@ -308,24 +308,70 @@ function extractWinwsArgs(batContent: string, zapretDir: string): string | null 
 
 export async function stopZapretProcess(): Promise<void> {
   if (process.platform !== 'win32') return
+
+  // 1. First attempt: standard taskkill (works if app itself is elevated)
   try {
-    await execFilePromise('taskkill', ['/F', '/IM', 'winws.exe']).catch(() => {})
+    await execFilePromise('taskkill', ['/F', '/IM', 'winws.exe', '/T']).catch(() => {})
   } catch {}
+
+  // 2. Check if winws.exe is still running (Access Denied for unprivileged caller)
+  let running = await isZapretRunning()
+  if (running) {
+    try {
+      // Elevated taskkill + stop WinDivert via RunAs
+      await execFilePromise('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `Start-Process cmd.exe -ArgumentList '/c', 'taskkill /F /IM winws.exe /T & net stop WinDivert & sc delete WinDivert & net stop WinDivert14 & sc delete WinDivert14' -Verb RunAs -WindowStyle Hidden -Wait`
+      ]).catch(() => {})
+    } catch (e) {
+      console.warn('[Zapret] Elevated stop error:', e)
+    }
+  }
+
+  // 3. Verify that winws.exe is really gone (polling up to 3 seconds)
+  for (let i = 0; i < 15; i++) {
+    running = await isZapretRunning()
+    if (!running) break
+    await new Promise((r) => setTimeout(r, 200))
+  }
+
+  // 4. Cleanup WinDivert driver service
   try {
     await execFilePromise('net', ['stop', 'WinDivert']).catch(() => {})
-  } catch {}
-  try {
-    await execFilePromise('sc', ['stop', 'WinDivert']).catch(() => {})
+    await execFilePromise('sc', ['delete', 'WinDivert']).catch(() => {})
+    await execFilePromise('net', ['stop', 'WinDivert14']).catch(() => {})
+    await execFilePromise('sc', ['delete', 'WinDivert14']).catch(() => {})
   } catch {}
 }
 
 export async function stopZapret(): Promise<{ success: boolean }> {
   await stopZapretProcess()
+  const stillRunning = await isZapretRunning()
+  if (stillRunning) {
+    throw new Error('Не удалось завершить процесс winws.exe. Пожалуйста, подтвердите права администратора.')
+  }
+
   await saveZapretMeta({ activeStrategy: undefined })
   mainWindow?.webContents.send('zapret-status-change', {
     status: 'stopped',
     running: false
   })
+
+  // Restart Mihomo core in the background so it is instantly ready for VPN mode
+  try {
+    const { restartCore } = await import('../core/manager')
+    const { getCoreState } = await import('../core/status')
+    const state = getCoreState()
+    if (state.status !== 'running') {
+      await restartCore().catch(() => {})
+    }
+  } catch (e) {
+    console.warn('[Zapret] Core recovery error on stop:', e)
+  }
+
   return { success: true }
 }
 

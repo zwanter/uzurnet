@@ -19,7 +19,7 @@ import {
   getCoreState
 } from '@renderer/utils/ipc'
 import { useTranslation } from 'react-i18next'
-import { memo, useEffect, useMemo, useState, useCallback } from 'react'
+import { memo, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {
@@ -154,13 +154,17 @@ const Home: React.FC = () => {
   const [activeMode, setActiveMode] = useState<'vpn' | 'zapret'>('vpn')
   const [autoSelectingZapret, setAutoSelectingZapret] = useState(false)
   const [autoSelectProgress, setAutoSelectProgress] = useState('')
+  const hasInitializedMode = useRef(false)
 
   const refreshZapret = useCallback(async () => {
     try {
       const s = await getZapretStatus()
       setZapretStatus(s)
-      if (s.running) {
-        setActiveMode('zapret')
+      if (!hasInitializedMode.current) {
+        hasInitializedMode.current = true
+        if (s.running) {
+          setActiveMode('zapret')
+        }
       }
     } catch {}
   }, [])
@@ -304,15 +308,19 @@ const Home: React.FC = () => {
       if (enable) {
         // 1. Stop Zapret if active
         if (zapretStatus?.running) {
+          toast.loading('Остановка Zapret перед подключением к VPN...', { id: 'switch-mode' })
           await stopZapret()
+          toast.dismiss('switch-mode')
           await refreshZapret()
         }
 
         // 2. Ensure Mihomo core is running (prevents "ядро не запущено")
         const coreState = await getCoreState()
         if (coreState.status !== 'running') {
+          toast.loading('Запуск ядра VPN...', { id: 'start-core' })
           await restartCore()
-          await new Promise((r) => setTimeout(r, 800))
+          toast.dismiss('start-core')
+          await new Promise((r) => setTimeout(r, 1200))
         }
 
         // 3. Connect TUN or SysProxy
@@ -347,7 +355,9 @@ const Home: React.FC = () => {
       window.electron.ipcRenderer.send('updateTrayMenu')
       await updateTrayIcon()
     } catch (e) {
-      toast.error(`${e}`)
+      toast.dismiss('switch-mode')
+      toast.dismiss('start-core')
+      toast.error(`Ошибка переключения: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setLoading(false)
     }
@@ -363,8 +373,10 @@ const Home: React.FC = () => {
     setLoading(true)
     try {
       if (zapretStatus.running) {
+        toast.loading('Остановка Zapret...', { id: 'zapret-toggle' })
         await stopZapret()
-        toast.info('Zapret остановлен')
+        toast.dismiss('zapret-toggle')
+        toast.success('Zapret успешно остановлен')
       } else {
         // Disconnect VPN if active
         if (tun?.enable) {
@@ -378,9 +390,9 @@ const Home: React.FC = () => {
         }
 
         const strat = zapretStatus.activeStrategy || zapretStatus.strategies[0] || 'general.bat'
-        toast.loading('Запуск Zapret...', { id: 'zapret-run' })
+        toast.loading('Запуск Zapret...', { id: 'zapret-toggle' })
         const res = await startZapret(strat)
-        toast.dismiss('zapret-run')
+        toast.dismiss('zapret-toggle')
         if (res.success) {
           toast.success(`Zapret запущен: ${strat}`)
         } else {
@@ -392,7 +404,7 @@ const Home: React.FC = () => {
       window.electron.ipcRenderer.send('updateTrayMenu')
       await updateTrayIcon()
     } catch (e) {
-      toast.dismiss('zapret-run')
+      toast.dismiss('zapret-toggle')
       toast.error(`Ошибка Zapret: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setLoading(false)

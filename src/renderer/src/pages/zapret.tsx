@@ -163,8 +163,10 @@ const ZapretPage: React.FC = () => {
     setOperating(true)
     try {
       if (status.running) {
+        toast.loading('Остановка Zapret...', { id: 'zapret-stop' })
         await stopZapret()
-        toast.info('Zapret остановлен')
+        toast.dismiss('zapret-stop')
+        toast.success('Zapret успешно остановлен')
       } else {
         const strat = selectedStrategy || (status.strategies[0] ?? 'general.bat')
         toast.loading('Запуск Zapret и отключение VPN...', { id: 'zapret-run' })
@@ -178,6 +180,7 @@ const ZapretPage: React.FC = () => {
       }
       await refreshStatus()
     } catch (e) {
+      toast.dismiss('zapret-stop')
       toast.dismiss('zapret-run')
       toast.error(`Ошибка: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
