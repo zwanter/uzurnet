@@ -1256,6 +1256,10 @@
 /* Hero Active Connection HUD */
 .hero-hud {
   padding: 24px 26px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+.dark .hero-hud {
   box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.5);
 }
 
@@ -1481,6 +1485,11 @@
   margin-top: 6px;
   border-radius: 8px;
   overflow: hidden;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border);
+}
+
+.dark .wave-container {
   background: rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.04);
 }

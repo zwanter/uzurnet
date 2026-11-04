@@ -34,7 +34,7 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="cursor-pointer hover:bg-white/10"
+                className="cursor-pointer hover:bg-accent"
                 onClick={() => navigate(-1)}
               >
                 <ChevronLeft className="size-5" />

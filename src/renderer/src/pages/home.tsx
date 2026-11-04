@@ -509,7 +509,7 @@ const Home: React.FC = () => {
     <div className="page-tab-content active-page w-full max-w-5xl mx-auto flex flex-col gap-5 select-none">
       {/* Profile Header Bar */}
       {currentProfile && (
-        <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl px-4 py-2.5">
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/60 dark:bg-white/[0.02] backdrop-blur-xl px-4 py-2.5 shadow-xs">
           <div className="flex items-center gap-3">
             {currentProfile.logo && (
               <img
@@ -523,7 +523,7 @@ const Home: React.FC = () => {
             )}
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm text-foreground">{currentProfile.name}</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold">
                 PRO
               </span>
             </div>
@@ -533,7 +533,7 @@ const Home: React.FC = () => {
               <button
                 onClick={handleUpdateProfile}
                 disabled={updating}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-border/60 transition-colors cursor-pointer"
               >
                 <RefreshCcw className={`size-3.5 ${updating ? 'animate-spin' : ''}`} />
                 <span>Обновить</span>
@@ -544,21 +544,21 @@ const Home: React.FC = () => {
       )}
 
       {/* ==================== MODE SWITCHER: VPN vs ZAPRET DPI ==================== */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-1.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-1.5 bg-card/70 dark:bg-white/[0.03] border border-border/70 dark:border-white/[0.08] rounded-2xl backdrop-blur-xl shadow-xs">
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
           <button
             onClick={() => setActiveMode('vpn')}
             className={cn(
               'flex items-center justify-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer',
               activeMode === 'vpn'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-950/40'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40 shadow-xs dark:shadow-md dark:shadow-emerald-950/40'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5'
             )}
           >
             <ShieldCheck className="size-4" />
             <span>VPN (Mihomo)</span>
             {isVpnSelected && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse ml-0.5" />
             )}
           </button>
           <button
@@ -566,14 +566,14 @@ const Home: React.FC = () => {
             className={cn(
               'flex items-center justify-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer',
               activeMode === 'zapret'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-md shadow-amber-950/40'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-xs dark:shadow-md dark:shadow-amber-950/40'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5'
             )}
           >
             <Zap className="size-4" />
             <span>Zapret DPI</span>
             {isZapretSelected && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping ml-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping ml-0.5" />
             )}
           </button>
         </div>
@@ -583,14 +583,14 @@ const Home: React.FC = () => {
             <button
               onClick={handleAutoSelectZapret}
               disabled={autoSelectingZapret || !zapretStatus?.installed}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 transition-all cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 dark:bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-800 dark:text-amber-300 transition-all cursor-pointer shadow-xs"
               title="Автоматический подбор рабочей стратегии под вашего провайдера"
             >
               <Sparkles className={cn('size-3.5', autoSelectingZapret && 'animate-spin')} />
               <span>{autoSelectingZapret ? autoSelectProgress || 'Подбор...' : '⚡ Автоподбор стратегии'}</span>
             </button>
           ) : (
-            <span className="text-[11px] text-muted-foreground hidden sm:inline px-2">
+            <span className="text-[11px] text-muted-foreground hidden sm:inline px-2 font-medium">
               Шифрованный туннель (Mihomo Core)
             </span>
           )}
@@ -609,7 +609,7 @@ const Home: React.FC = () => {
             <div className="hero-title-group flex items-center gap-3">
               {activeMode === 'zapret' ? (
                 <>
-                  <div className="size-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shadow-inner">
+                  <div className="size-7 rounded-lg bg-amber-500/15 dark:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold shadow-inner">
                     <Zap className="size-4 animate-pulse" />
                   </div>
                   <span className="hero-name">
@@ -620,7 +620,7 @@ const Home: React.FC = () => {
                     className={cn(
                       'ping-tag',
                       isZapretSelected &&
-                        'border-emerald-500/50 bg-emerald-500/15 text-emerald-400'
+                        'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-semibold'
                     )}
                   >
                     <span className="live-dot"></span>
@@ -678,19 +678,19 @@ const Home: React.FC = () => {
           <div className="telemetry-row">
             <div className="telemetry-col">
               <span className="telemetry-head">
-                <Radio className="size-3.5 text-amber-400" />
+                <Radio className="size-3.5 text-amber-600 dark:text-amber-400" />
                 Трафик YouTube
               </span>
-              <div className="telemetry-val text-sm font-medium text-emerald-400">
+              <div className="telemetry-val text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 {isZapretSelected ? 'DPI Desync Активен' : 'Отключен'}
               </div>
             </div>
             <div className="telemetry-col">
               <span className="telemetry-head">
-                <Radio className="size-3.5 text-indigo-400" />
+                <Radio className="size-3.5 text-indigo-600 dark:text-indigo-400" />
                 Трафик Discord
               </span>
-              <div className="telemetry-val text-sm font-medium text-emerald-400">
+              <div className="telemetry-val text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 {isZapretSelected ? 'DPI Desync Активен' : 'Отключен'}
               </div>
             </div>
@@ -817,21 +817,21 @@ const Home: React.FC = () => {
 
       {/* Subscription stats summary */}
       {subscription && !showExpiryNotice && (
-        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center rounded-2xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 my-1">
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center rounded-2xl border border-border/60 bg-card/60 dark:bg-card/40 backdrop-blur-xl p-3 my-1 shadow-xs">
           <div className="flex flex-col items-center py-2 px-1">
             <span className="text-xs text-muted-foreground">{t('pages.home.trafficRemaining')}</span>
             <span className="font-bold text-sm mt-0.5 text-foreground font-mono">
               {trafficTotal > 0 ? formatBytes(trafficRemaining) : <InfinityIcon className="size-4" />}
             </span>
           </div>
-          <div className="h-8 w-px bg-white/[0.08]" />
+          <div className="h-8 w-px bg-border/60 dark:bg-white/[0.08]" />
           <div className="flex flex-col items-center py-2 px-1">
             <span className="text-xs text-muted-foreground">{t('pages.home.daysRemaining')}</span>
             <span className="text-sm font-bold mt-0.5 text-foreground font-mono">
               {expireTimestamp > 0 ? daysRemaining : <InfinityIcon className="size-4" />}
             </span>
           </div>
-          <div className="h-8 w-px bg-white/[0.08]" />
+          <div className="h-8 w-px bg-border/60 dark:bg-white/[0.08]" />
           <div className="flex flex-col items-center py-2 px-1">
             <span className="text-xs text-muted-foreground">{t('pages.home.expires')}</span>
             <span className="text-sm font-bold mt-0.5 text-foreground font-mono">{expireDate}</span>
@@ -843,9 +843,9 @@ const Home: React.FC = () => {
       {subscription && showExpiryNotice && (
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 backdrop-blur-xl p-4 my-1 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <CalendarClock className="size-6 text-rose-400" />
+            <CalendarClock className="size-6 text-rose-500 dark:text-rose-400" />
             <div>
-              <p className="text-sm font-semibold text-rose-300">{expiryTitle}</p>
+              <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{expiryTitle}</p>
               <p className="text-xs text-muted-foreground">Истекает: {expireDate}</p>
             </div>
           </div>
@@ -853,7 +853,7 @@ const Home: React.FC = () => {
             <button
               type="button"
               onClick={() => open(renewAction.url)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/40 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/25 transition-all cursor-pointer"
             >
               <CreditCard className="size-3.5" />
               <span>{renewAction.label}</span>

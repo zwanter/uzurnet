@@ -282,7 +282,7 @@ const ShortcutInput: React.FC<{
         {inputValue && (
           <button
             type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 size-4 flex items-center justify-center text-muted-foreground hover:text-white transition-opacity opacity-0 group-hover:opacity-100 cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 size-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-opacity opacity-0 group-hover:opacity-100 cursor-pointer"
             title={t('common.clear', 'Очистить')}
             onClick={(e) => {
               e.stopPropagation()

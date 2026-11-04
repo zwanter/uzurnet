@@ -264,33 +264,33 @@ const ZapretPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-6 max-w-5xl mx-auto space-y-6">
+    <div className="page-tab-content active-page w-full max-w-5xl mx-auto flex flex-col gap-6 select-none pb-8">
       {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-card/80 via-card/50 to-emerald-950/20 p-6 backdrop-blur-xl shadow-xl">
+      <div className="relative shrink-0 overflow-hidden rounded-2xl border border-border/80 dark:border-white/10 bg-gradient-to-br from-card/90 via-card/60 to-emerald-500/10 dark:to-emerald-950/20 p-6 backdrop-blur-xl shadow-lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 shadow-inner">
+            <div className="p-3.5 rounded-xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-inner">
               <Zap className="w-8 h-8 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold tracking-tight text-white">Zapret DPI Bypass</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Zapret DPI Bypass</h1>
                 {status?.running ? (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 flex items-center gap-1.5 px-2.5 py-0.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1.5 px-2.5 py-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping" />
                     Активен
                   </Badge>
                 ) : status?.installed ? (
-                  <Badge variant="outline" className="text-zinc-400 border-white/10">
+                  <Badge variant="outline" className="text-muted-foreground border-border/60">
                     Остановлен
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-amber-400/80 border-amber-500/20">
+                  <Badge variant="outline" className="text-amber-600 dark:text-amber-400/80 border-amber-500/30">
                     Не установлен
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Автономный обход DPI для YouTube и Discord без внешних VPN-серверов (на базе Flowseal)
               </p>
             </div>
@@ -304,8 +304,8 @@ const ZapretPage: React.FC = () => {
                 onClick={handleToggleRunning}
                 className={
                   status.running
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-lg shadow-rose-950/40 w-full sm:w-auto'
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-950/40 w-full sm:w-auto'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-md shadow-rose-950/30 w-full sm:w-auto'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-md shadow-emerald-950/30 w-full sm:w-auto'
                 }
               >
                 {status.running ? (
@@ -325,7 +325,7 @@ const ZapretPage: React.FC = () => {
                 size="lg"
                 disabled={operating || loading}
                 onClick={handleInstallOrUpdate}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-950/40 w-full sm:w-auto"
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-md shadow-emerald-950/30 w-full sm:w-auto"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Скачать Zapret
@@ -334,8 +334,8 @@ const ZapretPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-xs text-zinc-400">
-          <AlertTriangle className="w-4 h-4 text-amber-400/70 shrink-0" />
+        <div className="mt-4 pt-4 border-t border-border/40 dark:border-white/5 flex items-center gap-2 text-xs text-muted-foreground">
+          <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400/80 shrink-0" />
           <span>
             <b>Взаимное исключение:</b> при запуске Zapret основной VPN (Mihomo) автоматически
             отключается во избежание конфликтов драйвера WinDivert.
@@ -345,43 +345,43 @@ const ZapretPage: React.FC = () => {
 
       {/* Download Progress Banner if active */}
       {downloadProgress !== null && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-2 backdrop-blur-md">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 p-4 space-y-2 backdrop-blur-md">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-emerald-300 font-medium">{downloadStatusText}</span>
-            <span className="text-emerald-400 font-mono text-xs">{downloadProgress}%</span>
+            <span className="text-emerald-700 dark:text-emerald-300 font-medium">{downloadStatusText}</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-mono text-xs">{downloadProgress}%</span>
           </div>
-          <Progress value={downloadProgress} className="h-2 bg-emerald-950/50" />
+          <Progress value={downloadProgress} className="h-2 bg-emerald-500/20 dark:bg-emerald-950/50" />
         </div>
       )}
 
       {/* Grid: 2 Columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Strategy Card */}
-        <div className="rounded-2xl border border-white/5 bg-card/40 p-5 backdrop-blur-md flex flex-col justify-between space-y-4">
+        <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md flex flex-col justify-between space-y-4 shadow-xs">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <Layers className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-base font-semibold text-white">Стратегия обхода DPI</h2>
+              <Layers className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-base font-semibold text-foreground">Стратегия обхода DPI</h2>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Выберите стратегию под вашего интернет-провайдера. По умолчанию рекомендуется{' '}
-              <code className="text-emerald-400 bg-emerald-950/40 px-1 py-0.5 rounded">general.bat</code>.
+              <code className="text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-950/40 px-1 py-0.5 rounded font-mono">general.bat</code>.
               Если видео зависают или Discord не подключается к голосовым каналам, переключитесь на ALT,
               ALT2 или FAKE TLS.
             </p>
 
             {status?.installed && status.strategies.length > 0 ? (
               <div className="space-y-2 pt-1">
-                <label className="text-xs font-medium text-zinc-300">Активный сценарий:</label>
+                <label className="text-xs font-medium text-foreground/80">Активный сценарий:</label>
                 <Select
                   value={selectedStrategy}
                   onValueChange={(val) => setSelectedStrategy(val)}
                   disabled={operating}
                 >
-                  <SelectTrigger className="w-full bg-black/30 border-white/10 text-white font-mono text-sm">
+                  <SelectTrigger className="w-full bg-background dark:bg-black/30 border-border dark:border-white/10 text-foreground font-mono text-sm">
                     <SelectValue placeholder="Выберите стратегию..." />
                   </SelectTrigger>
-                  <SelectContent className="max-h-64 bg-zinc-950 border-white/10 text-white">
+                  <SelectContent className="max-h-64 bg-popover dark:bg-zinc-950 border-border dark:border-white/10 text-popover-foreground dark:text-white">
                     {status.strategies.map((strat) => (
                       <SelectItem key={strat} value={strat} className="font-mono text-xs">
                         {strat} {strat === 'general.bat' ? '★ (Стандарт)' : ''}
@@ -391,7 +391,7 @@ const ZapretPage: React.FC = () => {
                 </Select>
               </div>
             ) : (
-              <div className="text-xs text-zinc-500 italic py-3">
+              <div className="text-xs text-muted-foreground italic py-3">
                 Стратегии станут доступны после загрузки Zapret.
               </div>
             )}
@@ -403,7 +403,7 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 onClick={handleAutoSelect}
                 disabled={autoSelecting || operating}
-                className="bg-amber-600/90 hover:bg-amber-500 text-white w-full flex items-center justify-center gap-2"
+                className="bg-amber-600 hover:bg-amber-500 text-white w-full flex items-center justify-center gap-2 shadow-xs"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${autoSelecting ? 'animate-spin' : ''}`} />
                 <span>
@@ -419,7 +419,7 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 onClick={handleToggleRunning}
                 disabled={operating || autoSelecting}
-                className="bg-emerald-600/80 hover:bg-emerald-600 text-white w-full"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white w-full shadow-xs"
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-2" />
                 Перезапустить с выбранной стратегией
@@ -429,28 +429,28 @@ const ZapretPage: React.FC = () => {
         </div>
 
         {/* Version & Updates Card */}
-        <div className="rounded-2xl border border-white/5 bg-card/40 p-5 backdrop-blur-md flex flex-col justify-between space-y-4">
+        <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md flex flex-col justify-between space-y-4 shadow-xs">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <FileCode className="w-5 h-5 text-teal-400" />
-              <h2 className="text-base font-semibold text-white">Версия и обновления Zapret</h2>
+              <FileCode className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              <h2 className="text-base font-semibold text-foreground">Версия и обновления Zapret</h2>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Zapret скачивается напрямую из официального репозитория Flowseal в вашу рабочую папку
               без засорения основного репозитория программы.
             </p>
 
-            <div className="bg-black/25 rounded-xl p-3 border border-white/5 space-y-2">
+            <div className="bg-muted/40 dark:bg-black/25 rounded-xl p-3 border border-border/50 dark:border-white/5 space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-zinc-400">Установленная версия:</span>
-                <span className="font-mono text-white font-medium">
+                <span className="text-muted-foreground">Установленная версия:</span>
+                <span className="font-mono text-foreground font-medium">
                   {status?.version ? `v${status.version}` : 'Не установлена'}
                 </span>
               </div>
               {status?.activeStrategy && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-zinc-400">Текущий запуск:</span>
-                  <span className="font-mono text-emerald-400">{status.activeStrategy}</span>
+                  <span className="text-muted-foreground">Текущий запуск:</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{status.activeStrategy}</span>
                 </div>
               )}
             </div>
@@ -462,7 +462,7 @@ const ZapretPage: React.FC = () => {
               size="sm"
               disabled={checkingRelease || operating}
               onClick={handleCheckRelease}
-              className="border-white/10 hover:bg-white/5 text-zinc-200 text-xs flex-1"
+              className="border-border/60 hover:bg-accent text-foreground text-xs flex-1"
             >
               <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${checkingRelease ? 'animate-spin' : ''}`} />
               Проверить релиз
@@ -473,7 +473,7 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 disabled={operating}
                 onClick={handleInstallOrUpdate}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs flex-1"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs flex-1 shadow-xs"
               >
                 <Download className="w-3.5 h-3.5 mr-1.5" />
                 {status?.installed ? 'Обновить' : 'Скачать'}
@@ -484,14 +484,14 @@ const ZapretPage: React.FC = () => {
       </div>
 
       {/* Service Availability Tester Card */}
-      <div className="rounded-2xl border border-white/5 bg-card/40 p-5 backdrop-blur-md space-y-4">
+      <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md space-y-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <Radio className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-base font-semibold text-white">Проверка доступности сервисов</h2>
+              <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-base font-semibold text-foreground">Проверка доступности сервисов</h2>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-muted-foreground">
               Прямое тестирование доступности без пинга (проверяет реальный пропуск потоков
               googlevideo и discord gateway через DPI).
             </p>
@@ -501,7 +501,7 @@ const ZapretPage: React.FC = () => {
             size="sm"
             onClick={handleCheckServices}
             disabled={checkingServices}
-            className="bg-zinc-800 hover:bg-zinc-700 text-white border border-white/10 shrink-0"
+            className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border shrink-0 shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-2 ${checkingServices ? 'animate-spin' : ''}`} />
             Проверить доступность
@@ -510,102 +510,102 @@ const ZapretPage: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
           {/* YouTube Status */}
-          <div className="p-4 rounded-xl border border-white/5 bg-black/30 space-y-3">
+          <div className="p-4 rounded-xl border border-border/60 dark:border-white/5 bg-muted/40 dark:bg-black/30 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-white flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 YouTube
               </span>
               {serviceResults ? (
                 serviceResults.youtube ? (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                  <Badge className="bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
                     Доступен
                   </Badge>
                 ) : (
-                  <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30">
+                  <Badge className="bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30">
                     Заблокирован
                   </Badge>
                 )
               ) : (
-                <Badge variant="outline" className="text-zinc-500 border-white/5">
+                <Badge variant="outline" className="text-muted-foreground border-border/60">
                   Не проверялся
                 </Badge>
               )}
             </div>
 
             <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-zinc-400">
+              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
                 <span>Веб-интерфейс (youtube.com):</span>
                 {serviceResults ? (
                   serviceResults.details.youtubeWeb ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
                   )
                 ) : (
-                  <span className="text-zinc-600">—</span>
+                  <span className="text-muted-foreground/60">—</span>
                 )}
               </div>
-              <div className="flex justify-between items-center text-zinc-400">
+              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
                 <span>Видеопоток (googlevideo):</span>
                 {serviceResults ? (
                   serviceResults.details.youtubeVideo ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
                   )
                 ) : (
-                  <span className="text-zinc-600">—</span>
+                  <span className="text-muted-foreground/60">—</span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Discord Status */}
-          <div className="p-4 rounded-xl border border-white/5 bg-black/30 space-y-3">
+          <div className="p-4 rounded-xl border border-border/60 dark:border-white/5 bg-muted/40 dark:bg-black/30 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-white flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 Discord
               </span>
               {serviceResults ? (
                 serviceResults.discord ? (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                  <Badge className="bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
                     Доступен
                   </Badge>
                 ) : (
-                  <Badge className="bg-rose-500/20 text-rose-400 border-rose-500/30">
+                  <Badge className="bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30">
                     Заблокирован
                   </Badge>
                 )
               ) : (
-                <Badge variant="outline" className="text-zinc-500 border-white/5">
+                <Badge variant="outline" className="text-muted-foreground border-border/60">
                   Не проверялся
                 </Badge>
               )}
             </div>
 
             <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-zinc-400">
+              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
                 <span>Веб-клиент (discord.com):</span>
                 {serviceResults ? (
                   serviceResults.details.discordWeb ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
                   )
                 ) : (
-                  <span className="text-zinc-600">—</span>
+                  <span className="text-muted-foreground/60">—</span>
                 )}
               </div>
-              <div className="flex justify-between items-center text-zinc-400">
+              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
                 <span>Голос и шлюз (gateway):</span>
                 {serviceResults ? (
                   serviceResults.details.discordGateway ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
                   )
                 ) : (
-                  <span className="text-zinc-600">—</span>
+                  <span className="text-muted-foreground/60">—</span>
                 )}
               </div>
             </div>
@@ -614,23 +614,23 @@ const ZapretPage: React.FC = () => {
       </div>
 
       {/* Hosts Optimization Card */}
-      <div className="rounded-2xl border border-white/5 bg-card/40 p-5 backdrop-blur-md space-y-4">
+      <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md space-y-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <Shield className="w-5 h-5 text-indigo-400" />
-              <h2 className="text-base font-semibold text-white">Оптимизация файла hosts</h2>
+              <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h2 className="text-base font-semibold text-foreground">Оптимизация файла hosts</h2>
               {status?.hostsInstalled ? (
-                <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 ml-2">
+                <Badge className="bg-indigo-500/15 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 ml-2">
                   Применен
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-zinc-500 border-white/10 ml-2">
+                <Badge variant="outline" className="text-muted-foreground border-border/60 ml-2">
                   Не применен
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Направляет голосовые серверы Discord и CDN напрямую через официальный список Flowseal,
               предотвращая отравление DNS провайдером.
             </p>
@@ -643,7 +643,7 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 disabled={hostsLoading}
                 onClick={handleRemoveHosts}
-                className="border-rose-500/30 text-rose-300 hover:bg-rose-950/20 text-xs"
+                className="border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 text-xs"
               >
                 Удалить из hosts
               </Button>
@@ -652,7 +652,7 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 disabled={hostsLoading}
                 onClick={handleApplyHosts}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs shadow-xs"
               >
                 <Shield className="w-3.5 h-3.5 mr-1.5" />
                 Применить hosts

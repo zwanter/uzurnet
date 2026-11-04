@@ -140,7 +140,7 @@ export const KineticWave: React.FC<KineticWaveProps> = ({ active = true, classNa
   }, [active])
 
   return (
-    <div className={`relative w-full h-24 overflow-hidden rounded-lg bg-black/20 border border-white/5 ${className}`}>
+    <div className={`relative w-full h-full overflow-hidden rounded-lg bg-transparent border-0 ${className}`}>
       <canvas ref={canvasRef} className="w-full h-full block" />
     </div>
   )
