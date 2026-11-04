@@ -568,6 +568,80 @@ export async function getServerMetrics(): Promise<Record<string, ServerMetricIte
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getServerMetrics'))
 }
 
+export interface ZapretStatus {
+  installed: boolean
+  version: string | null
+  installedAt?: number
+  running: boolean
+  activeStrategy: string | null
+  strategies: string[]
+  hostsInstalled: boolean
+}
+
+export interface ZapretServiceCheckResult {
+  youtube: boolean
+  discord: boolean
+  details: {
+    youtubeWeb: boolean
+    youtubeVideo: boolean
+    discordWeb: boolean
+    discordGateway: boolean
+  }
+  timestamp: number
+}
+
+export interface ZapretReleaseInfo {
+  version: string
+  downloadUrl: string
+  size: number
+  name: string
+  hasUpdate: boolean
+}
+
+export async function getZapretStatus(): Promise<ZapretStatus> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getZapretStatus'))
+}
+
+export async function checkZapretRelease(): Promise<ZapretReleaseInfo> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkZapretRelease'))
+}
+
+export async function downloadAndInstallZapret(): Promise<{ success: boolean; version: string }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('downloadAndInstallZapret'))
+}
+
+export async function startZapret(
+  strategy?: string
+): Promise<{ success: boolean; strategy: string }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('startZapret', strategy))
+}
+
+export async function stopZapret(): Promise<{ success: boolean }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('stopZapret'))
+}
+
+export async function checkZapretServices(): Promise<ZapretServiceCheckResult> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkZapretServices'))
+}
+
+export async function applyZapretHosts(): Promise<{ success: boolean }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('applyZapretHosts'))
+}
+
+export async function removeZapretHosts(): Promise<{ success: boolean }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('removeZapretHosts'))
+}
+
+export async function autoSelectZapretStrategy(): Promise<{
+  success: boolean
+  strategy?: string
+  score?: number
+  details?: ZapretServiceCheckResult
+  message?: string
+}> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('autoSelectZapretStrategy'))
+}
+
 // Override window.alert to use toast notifications instead of system dialogs
 async function alert<T>(msg: T): Promise<void> {
   const { toast } = await import('sonner')

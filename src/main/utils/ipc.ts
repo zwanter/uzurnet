@@ -66,6 +66,17 @@ import { getCoreState } from '../core/status'
 import { triggerSysProxy } from '../sys/sysproxy'
 import { checkUpdate, downloadAndInstallUpdate, cancelUpdate } from '../resolve/autoUpdater'
 import {
+  getZapretStatus,
+  checkZapretRelease,
+  downloadAndInstallZapret,
+  startZapret,
+  stopZapret,
+  checkZapretServices,
+  applyZapretHosts,
+  removeZapretHosts,
+  autoSelectZapretStrategy
+} from '../resolve/zapret'
+import {
   checkElevateTask,
   deleteElevateTask,
   getFilePath,
@@ -451,4 +462,17 @@ export function registerIpcMainHandlers(): void {
     setNotQuitDialog()
     app.quit()
   })
+
+  // Zapret Handlers
+  ipcMain.handle('getZapretStatus', () => ipcErrorWrapper(getZapretStatus)())
+  ipcMain.handle('checkZapretRelease', () => ipcErrorWrapper(checkZapretRelease)())
+  ipcMain.handle('downloadAndInstallZapret', () => ipcErrorWrapper(downloadAndInstallZapret)())
+  ipcMain.handle('startZapret', (_e, strategy?: string) =>
+    ipcErrorWrapper(async () => startZapret(strategy))()
+  )
+  ipcMain.handle('stopZapret', () => ipcErrorWrapper(stopZapret)())
+  ipcMain.handle('checkZapretServices', () => ipcErrorWrapper(checkZapretServices)())
+  ipcMain.handle('applyZapretHosts', () => ipcErrorWrapper(applyZapretHosts)())
+  ipcMain.handle('removeZapretHosts', () => ipcErrorWrapper(removeZapretHosts)())
+  ipcMain.handle('autoSelectZapretStrategy', () => ipcErrorWrapper(autoSelectZapretStrategy)())
 }

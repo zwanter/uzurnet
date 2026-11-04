@@ -145,6 +145,11 @@ async function launchCore(detached = false): Promise<Promise<void>[]> {
   const { current } = await getProfileConfig()
   const { tun } = await getControledMihomoConfig()
 
+  try {
+    const { stopZapretProcess } = await import('../resolve/zapret')
+    await stopZapretProcess()
+  } catch {}
+
   // Older configs may name the removed system core or an alpha core this build left out
   if (core !== 'mihomo' && !installedCores().includes(core)) {
     await patchAppConfig({ core: 'mihomo' })

@@ -12,7 +12,12 @@ import Resources from '@renderer/pages/resources'
 import DNS from '@renderer/pages/dns'
 import Sniffer from '@renderer/pages/sniffer'
 import Home from '@renderer/pages/home'
+import Zapret from '@renderer/pages/zapret'
 const routes = [
+  {
+    path: '/zapret',
+    element: <Zapret />
+  },
   {
     path: '/mihomo',
     element: <Mihomo />

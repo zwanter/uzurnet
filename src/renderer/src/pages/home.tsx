@@ -9,10 +9,17 @@ import {
   mihomoHotReloadConfig,
   mihomoChangeProxy,
   getServerMetrics,
-  ServerMetricItem
+  ServerMetricItem,
+  getZapretStatus,
+  startZapret,
+  stopZapret,
+  autoSelectZapretStrategy,
+  ZapretStatus,
+  restartCore,
+  getCoreState
 } from '@renderer/utils/ipc'
 import { useTranslation } from 'react-i18next'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {
@@ -25,7 +32,9 @@ import {
   Zap,
   Layers,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Radio
 } from 'lucide-react'
 import { SiTelegram } from 'react-icons/si'
 import EditInfoModal from '@renderer/components/profiles/edit-info-modal'
@@ -141,13 +150,66 @@ const Home: React.FC = () => {
 
   const trafficInfo = useTrafficStore((s) => s.traffic)
   const [loading, setLoading] = useState(false)
+  const [zapretStatus, setZapretStatus] = useState<ZapretStatus | null>(null)
+  const [activeMode, setActiveMode] = useState<'vpn' | 'zapret'>('vpn')
+  const [autoSelectingZapret, setAutoSelectingZapret] = useState(false)
+  const [autoSelectProgress, setAutoSelectProgress] = useState('')
+
+  const refreshZapret = useCallback(async () => {
+    try {
+      const s = await getZapretStatus()
+      setZapretStatus(s)
+      if (s.running) {
+        setActiveMode('zapret')
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    refreshZapret()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cleanupZapret = (window.electron.ipcRenderer as any).on(
+      'zapret-status-change',
+      () => {
+        refreshZapret()
+      }
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cleanupProg = (window.electron.ipcRenderer as any).on(
+      'zapret-autoselect-progress',
+      (_: any, data: any) => {
+        setAutoSelectProgress(`Тест ${data.strategy} (${data.index}/${data.total})...`)
+      }
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cleanupDone = (window.electron.ipcRenderer as any).on(
+      'zapret-autoselect-complete',
+      () => {
+        setAutoSelectingZapret(false)
+        setAutoSelectProgress('')
+        refreshZapret()
+      }
+    )
+
+    return () => {
+      if (cleanupZapret && typeof cleanupZapret === 'function') cleanupZapret()
+      if (cleanupProg && typeof cleanupProg === 'function') cleanupProg()
+      if (cleanupDone && typeof cleanupDone === 'function') cleanupDone()
+    }
+  }, [refreshZapret])
 
   const coreProblem = useCoreLifecycleStore((s) => s.coreState.status === 'error')
-  const isSelected = !coreProblem && ((tun?.enable ?? false) || proxyMode)
+  const isZapretSelected = Boolean(zapretStatus?.running)
+  const isVpnSelected = !coreProblem && !isZapretSelected && ((tun?.enable ?? false) || proxyMode)
+  const isSelected = activeMode === 'zapret' ? isZapretSelected : isVpnSelected
 
   const isDisabled =
     loading ||
-    (!coreProblem &&
+    (activeMode === 'vpn' &&
+      !coreProblem &&
       mainSwitchMode === 'sysproxy' &&
       writeSysProxy &&
       mode == 'manual' &&
@@ -232,9 +294,28 @@ const Home: React.FC = () => {
   }, [supportUrl])
 
   const onValueChange = async (enable: boolean): Promise<void> => {
+    if (activeMode === 'zapret') {
+      await handleToggleZapret()
+      return
+    }
+
     setLoading(true)
     try {
       if (enable) {
+        // 1. Stop Zapret if active
+        if (zapretStatus?.running) {
+          await stopZapret()
+          await refreshZapret()
+        }
+
+        // 2. Ensure Mihomo core is running (prevents "ядро не запущено")
+        const coreState = await getCoreState()
+        if (coreState.status !== 'running') {
+          await restartCore()
+          await new Promise((r) => setTimeout(r, 800))
+        }
+
+        // 3. Connect TUN or SysProxy
         if (mainSwitchMode === 'tun') {
           await patchControledMihomoConfig({ tun: { enable: true }, dns: { enable: true } })
           await mihomoHotReloadConfig()
@@ -269,6 +350,79 @@ const Home: React.FC = () => {
       toast.error(`${e}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleZapret = async (): Promise<void> => {
+    if (!zapretStatus?.installed) {
+      toast.info('Zapret еще не установлен. Перенаправляем на страницу установки...')
+      navigate('/zapret')
+      return
+    }
+
+    setLoading(true)
+    try {
+      if (zapretStatus.running) {
+        await stopZapret()
+        toast.info('Zapret остановлен')
+      } else {
+        // Disconnect VPN if active
+        if (tun?.enable) {
+          await patchControledMihomoConfig({ tun: { enable: false } })
+        }
+        if (proxyMode) {
+          if (writeSysProxy) {
+            await triggerSysProxy(false, onlyActiveDevice)
+          }
+          await patchAppConfig({ proxyMode: false })
+        }
+
+        const strat = zapretStatus.activeStrategy || zapretStatus.strategies[0] || 'general.bat'
+        toast.loading('Запуск Zapret...', { id: 'zapret-run' })
+        const res = await startZapret(strat)
+        toast.dismiss('zapret-run')
+        if (res.success) {
+          toast.success(`Zapret запущен: ${strat}`)
+        } else {
+          toast.warning('Запрос отправлен. Проверьте права администратора.')
+        }
+      }
+      await refreshZapret()
+      window.electron.ipcRenderer.send('updateFloatingWindow')
+      window.electron.ipcRenderer.send('updateTrayMenu')
+      await updateTrayIcon()
+    } catch (e) {
+      toast.dismiss('zapret-run')
+      toast.error(`Ошибка Zapret: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAutoSelectZapret = async (): Promise<void> => {
+    if (!zapretStatus?.installed) {
+      toast.info('Сначала скачайте Zapret на странице Zapret DPI')
+      navigate('/zapret')
+      return
+    }
+
+    setAutoSelectingZapret(true)
+    toast.loading('Подбор рабочей стратегии под вашего провайдера...', { id: 'zapret-autoselect' })
+    try {
+      const res = await autoSelectZapretStrategy()
+      toast.dismiss('zapret-autoselect')
+      if (res.success && res.strategy) {
+        toast.success(`Подобрана рабочая стратегия: ${res.strategy}!`)
+        await refreshZapret()
+        setActiveMode('zapret')
+      } else {
+        toast.error(res.message || 'Не удалось подобрать стратегию автоматически')
+      }
+    } catch (e) {
+      toast.dismiss('zapret-autoselect')
+      toast.error(`Ошибка подбора: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setAutoSelectingZapret(false)
     }
   }
 
@@ -389,33 +543,125 @@ const Home: React.FC = () => {
         </div>
       )}
 
+      {/* ==================== MODE SWITCHER: VPN vs ZAPRET DPI ==================== */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-1.5 bg-white/[0.03] border border-white/[0.08] rounded-2xl backdrop-blur-xl">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+          <button
+            onClick={() => setActiveMode('vpn')}
+            className={cn(
+              'flex items-center justify-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer',
+              activeMode === 'vpn'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-950/40'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ShieldCheck className="size-4" />
+            <span>VPN (Mihomo)</span>
+            {isVpnSelected && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveMode('zapret')}
+            className={cn(
+              'flex items-center justify-center gap-2 flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer',
+              activeMode === 'zapret'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-md shadow-amber-950/40'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Zap className="size-4" />
+            <span>Zapret DPI</span>
+            {isZapretSelected && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping ml-0.5" />
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pr-1">
+          {activeMode === 'zapret' ? (
+            <button
+              onClick={handleAutoSelectZapret}
+              disabled={autoSelectingZapret || !zapretStatus?.installed}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 transition-all cursor-pointer shadow-sm"
+              title="Автоматический подбор рабочей стратегии под вашего провайдера"
+            >
+              <Sparkles className={cn('size-3.5', autoSelectingZapret && 'animate-spin')} />
+              <span>{autoSelectingZapret ? autoSelectProgress || 'Подбор...' : '⚡ Автоподбор стратегии'}</span>
+            </button>
+          ) : (
+            <span className="text-[11px] text-muted-foreground hidden sm:inline px-2">
+              Шифрованный туннель (Mihomo Core)
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* ==================== HERO ACTIVE CONNECTION HUD ==================== */}
       <div className="pm-card beam-border hero-hud relative">
         <div className="hero-top-row">
           <div>
-            <div className="hero-label">Текущее активное подключение</div>
+            <div className="hero-label">
+              {activeMode === 'zapret'
+                ? 'Режим обхода: Zapret DPI (Без VPN)'
+                : 'Текущее активное подключение (VPN)'}
+            </div>
             <div className="hero-title-group flex items-center gap-3">
-              {/* Vector SVG Country Flag Badge */}
-              <CountryFlag countryCode={activeCountryCode} />
-              <span className="hero-name">{activeServerName}</span>
-              <span className={cn('ping-tag', isSelected && 'border-emerald-500/50 bg-emerald-500/15 text-emerald-400')}>
-                <span className="live-dot"></span>
-                {isSelected ? <ConnectedTimer active={isSelected} /> : 'Отключено'}
-              </span>
+              {activeMode === 'zapret' ? (
+                <>
+                  <div className="size-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold shadow-inner">
+                    <Zap className="size-4 animate-pulse" />
+                  </div>
+                  <span className="hero-name">
+                    {zapretStatus?.activeStrategy ||
+                      (zapretStatus?.installed ? 'general.bat' : 'Zapret не установлен')}
+                  </span>
+                  <span
+                    className={cn(
+                      'ping-tag',
+                      isZapretSelected &&
+                        'border-emerald-500/50 bg-emerald-500/15 text-emerald-400'
+                    )}
+                  >
+                    <span className="live-dot"></span>
+                    {isZapretSelected
+                      ? 'Активен'
+                      : zapretStatus?.installed
+                        ? 'Остановлен'
+                        : 'Не установлен'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {/* Vector SVG Country Flag Badge */}
+                  <CountryFlag countryCode={activeCountryCode} />
+                  <span className="hero-name">{activeServerName}</span>
+                  <span
+                    className={cn(
+                      'ping-tag',
+                      isVpnSelected &&
+                        'border-emerald-500/50 bg-emerald-500/15 text-emerald-400'
+                    )}
+                  >
+                    <span className="live-dot"></span>
+                    {isVpnSelected ? <ConnectedTimer active={isVpnSelected} /> : 'Отключено'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           <div className="hero-actions">
             <button
-              onClick={() => navigate('/proxies')}
+              onClick={() => navigate(activeMode === 'zapret' ? '/zapret' : '/proxies')}
               className="pm-btn flex items-center gap-1.5 cursor-pointer"
             >
               <Layers className="size-4" />
-              <span>Серверы</span>
+              <span>{activeMode === 'zapret' ? 'Стратегии' : 'Серверы'}</span>
             </button>
             <button
               disabled={isDisabled}
-              onClick={() => (coreProblem ? reopenCoreError() : onValueChange(!isSelected))}
+              onClick={() => (coreProblem && activeMode === 'vpn' ? reopenCoreError() : onValueChange(!isSelected))}
               className={cn(
                 'pm-btn primary flex items-center gap-1.5 cursor-pointer',
                 isSelected && 'bg-rose-500/20 border-rose-500/40 text-rose-300'
@@ -428,26 +674,49 @@ const Home: React.FC = () => {
         </div>
 
         {/* Telemetry Metrics Row */}
-        <div className="telemetry-row">
-          <div className="telemetry-col">
-            <span className="telemetry-head">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
-              Загрузка (Входящий)
-            </span>
-            <div className="telemetry-val">
-              {calcTraffic(trafficInfo.down)}
+        {activeMode === 'zapret' ? (
+          <div className="telemetry-row">
+            <div className="telemetry-col">
+              <span className="telemetry-head">
+                <Radio className="size-3.5 text-amber-400" />
+                Трафик YouTube
+              </span>
+              <div className="telemetry-val text-sm font-medium text-emerald-400">
+                {isZapretSelected ? 'DPI Desync Активен' : 'Отключен'}
+              </div>
+            </div>
+            <div className="telemetry-col">
+              <span className="telemetry-head">
+                <Radio className="size-3.5 text-indigo-400" />
+                Трафик Discord
+              </span>
+              <div className="telemetry-val text-sm font-medium text-emerald-400">
+                {isZapretSelected ? 'DPI Desync Активен' : 'Отключен'}
+              </div>
             </div>
           </div>
-          <div className="telemetry-col">
-            <span className="telemetry-head">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-              Отдача (Исходящий)
-            </span>
-            <div className="telemetry-val">
-              {calcTraffic(trafficInfo.up)}
+        ) : (
+          <div className="telemetry-row">
+            <div className="telemetry-col">
+              <span className="telemetry-head">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                Загрузка (Входящий)
+              </span>
+              <div className="telemetry-val">
+                {calcTraffic(trafficInfo.down)}
+              </div>
+            </div>
+            <div className="telemetry-col">
+              <span className="telemetry-head">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                Отдача (Исходящий)
+              </span>
+              <div className="telemetry-val">
+                {calcTraffic(trafficInfo.up)}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Realtime Kinetic Dual Bezier Wave Visualizer */}
         <div className="wave-container my-2">

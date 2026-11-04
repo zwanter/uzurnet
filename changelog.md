@@ -1,51 +1,29 @@
-## 1.5.0
+## 1.6.3
 
-- alerts about kernel issues (configuration, antivirus, etc.)
-- updating the profile even when the HWID limit is reached
-- the look of the logs has been improved
-- the size of the storage space has been reduced
-- fixed logs size issue
-- mixed/socks/etc ports from the profile are now being used
-- minor fixes
+- Встроена интеграция Zapret DPI (Flowseal) для прямого обхода блокировок YouTube и Discord без VPN
+- Загрузка и обновление Zapret в 1 клик напрямую из приложения без захламления репозитория
+- Алгоритм интеллектуального автоподбора рабочей стратегии («⚡ Автоподбор стратегии»)
+- Удобный переключатель режимов VPN / Zapret прямо на главной странице
+- Бесшовное взаимное исключение между ядром Mihomo и драйвером WinDivert
+- Автоматическая проверка доступности потоков YouTube и шлюзов Discord без пинга
+- Управление файлом hosts Flowseal для Discord Voice и GitHub
+- Исправлена ошибка парсинга подписок 1sub.su и краш при выборе прокси
+### Download link：
 
-## 1.4.1
+#### Windows 10/11：
 
-- hotfix
-
-## 1.4.0
-
-- fixed bug with proxy providers
-- added new headers: expand-proxy-groups, profile-web-page-name
-- minor ui fixes
-- added alert about expiring subscription
-- new bugs :)
-
-## 1.3.1
-
-- fixed system proxy
-- fixed bug from issue #89
-
-## 1.3.0
-
-- new update notifier
-- improved ui on proxies page
-- added default values for route-exclude-address
-- added headers for hiding global mode and downloading custom css
-- added yaml view in rules editor
-- improved hwid (for Remnawave v2.8.0)
-- fix setup public dns on macos
-- added translations in monaco editor
-- fixed ui for overrided GLOBAL selector
+<a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_x64-setup.exe"><img src="https://img.shields.io/badge/EXE-default?style=flat&logo=windows&label=64-bit"></a> <a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_arm64-setup.exe"><img src="https://img.shields.io/badge/EXE-default?style=flat&logo=windows&label=ARM64"></a>
 
 
+#### macOS 11+：
 
-## 1.2.0
+<a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_x64.pkg"><img src="https://img.shields.io/badge/PKG-default?style=flat&logo=apple&label=Intel"></a> <a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_arm64.pkg"><img src="https://img.shields.io/badge/PKG-default?style=flat&logo=apple&label=Apple%20Silicon"></a>
 
-- reduced memory usage
-- fix problem with deeplink alert after restart with autostart enabled
-- implement hot reloading config
-- fix bug with adding a rule at the end
-- fixed an issue with retrieving data via a proxy
-- fixed an issue with profile updates (please test)
-- ui fixes
-- other optimizations
+
+#### Linux：
+
+<a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_amd64.deb"><img src="https://img.shields.io/badge/DEB-default?style=flat&logo=linux&label=64-bit"></a> <a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_arm64.deb"><img src="https://img.shields.io/badge/DEB-default?style=flat&logo=linux&label=ARM64"></a>
+
+<a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_x86_64.rpm"><img src="https://img.shields.io/badge/RPM-default?style=flat&logo=linux&label=64-bit"></a> <a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_aarch64.rpm"><img src="https://img.shields.io/badge/RPM-default?style=flat&logo=linux&label=ARM64"></a>
+
+<a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_x64.pkg.tar.xz"><img src="https://img.shields.io/badge/PACMAN-default?style=flat&logo=archlinux&label=64-bit"></a> <a href="https://github.com/zwanter/uzurnet/releases/download/1.6.3/UzurNet_aarch64.pkg.tar.xz"><img src="https://img.shields.io/badge/PACMAN-default?style=flat&logo=archlinux&label=ARM64"></a>

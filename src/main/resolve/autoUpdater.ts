@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig, CancelTokenSource } from 'axios'
+import axios, { AxiosRequestConfig, AxiosResponse, CancelTokenSource } from 'axios'
 import { parseYaml } from '../utils/yaml'
 import { app, shell } from 'electron'
 import { getRuntimeConfig } from '../core/factory'

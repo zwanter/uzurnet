@@ -12,3 +12,4 @@ out
 .zed
 *.tsbuildinfo
 latest.yml
+rawChangelog.md
