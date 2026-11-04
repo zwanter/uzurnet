@@ -1,5 +1,5 @@
 import yaml from 'yaml'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { extractVersionSection } from './changelog.mjs'
 
 const pkg = readFileSync('package.json', 'utf-8')
@@ -16,16 +16,28 @@ const badge = (format, label, logo) =>
 const link = (url, format, label, logo) =>
   `<a href="${url}"><img src="${badge(format, label, logo)}"></a>`
 
-if (process.env.SKIP_CHANGELOG !== '1') {
+if (process.env.SKIP_CHANGELOG !== '1' && !changelog.includes('Ссылки для скачивания')) {
   changelog += '\n### Ссылки для скачивания:\n\n#### Windows 10/11 (64-bit):\n\n'
   changelog += link(`${downloadUrl}/UzurNet_x64-setup.exe`, 'EXE', 'Установщик (64-bit)', 'windows') + ' '
   changelog += link(`${downloadUrl}/UzurNet_x64-portable.7z`, '7Z', 'Портативная версия (64-bit)', 'windows') + '\n\n'
 }
 
+let builderMetadata = {}
+if (existsSync('dist/latest.yml')) {
+  try {
+    builderMetadata = yaml.parse(readFileSync('dist/latest.yml', 'utf-8')) || {}
+  } catch {}
+}
+
 const latest = {
+  ...builderMetadata,
   version,
+  releaseNotes: changelog,
   changelog
 }
 
 writeFileSync('latest.yml', yaml.stringify(latest))
+if (existsSync('dist')) {
+  writeFileSync('dist/latest.yml', yaml.stringify(latest))
+}
 writeFileSync('changelog.md', changelog)
