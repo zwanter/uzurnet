@@ -1,6 +1,6 @@
 {
   "name": "uzurnet",
-  "version": "1.6.3",
+  "version": "1.5.0",
   "description": "UzurNet",
   "main": "./out/main/index.js",
   "author": "zwanter",
