@@ -7,7 +7,8 @@ const rawChangelog = readFileSync('changelog.md', 'utf-8')
 const { version } = JSON.parse(pkg)
 
 let changelog = extractVersionSection(rawChangelog, version)
-const downloadUrl = `https://github.com/zwanter/uzurnet/releases/download/${version}`
+const tag = version.startsWith('v') ? version : `v${version}`
+const downloadUrl = `https://github.com/zwanter/uzurnet/releases/download/${tag}`
 
 const badge = (format, label, logo) =>
   `https://img.shields.io/badge/${format}-default?style=flat&logo=${logo}&label=${encodeURIComponent(label)}`
