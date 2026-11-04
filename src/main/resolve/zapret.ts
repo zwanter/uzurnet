@@ -15,6 +15,7 @@ export interface ZapretStatus {
   installedAt?: number
   running: boolean
   activeStrategy: string | null
+  selectedStrategy?: string
   strategies: string[]
   hostsInstalled: boolean
 }
@@ -55,7 +56,12 @@ const HOSTS_PATH = 'C:\\Windows\\System32\\drivers\\etc\\hosts'
 const HOSTS_START_TAG = '# === UZURNET ZAPRET START ==='
 const HOSTS_END_TAG = '# === UZURNET ZAPRET END ==='
 
-async function getZapretMeta(): Promise<{ version?: string; installedAt?: number; activeStrategy?: string }> {
+async function getZapretMeta(): Promise<{
+  version?: string
+  installedAt?: number
+  activeStrategy?: string
+  selectedStrategy?: string
+}> {
   try {
     const metaPath = path.join(getZapretDir(), 'version.json')
     if (existsSync(metaPath)) {
@@ -68,7 +74,12 @@ async function getZapretMeta(): Promise<{ version?: string; installedAt?: number
   return {}
 }
 
-async function saveZapretMeta(patch: { version?: string; installedAt?: number; activeStrategy?: string }): Promise<void> {
+export async function saveZapretMeta(patch: {
+  version?: string
+  installedAt?: number
+  activeStrategy?: string
+  selectedStrategy?: string
+}): Promise<void> {
   try {
     const zapretDir = getZapretDir()
     if (!existsSync(zapretDir)) {
@@ -80,6 +91,10 @@ async function saveZapretMeta(patch: { version?: string; installedAt?: number; a
   } catch (e) {
     console.warn('[Zapret] Save meta error:', e)
   }
+}
+
+export async function saveSelectedStrategy(strategy: string): Promise<void> {
+  await saveZapretMeta({ selectedStrategy: strategy })
 }
 
 export async function isZapretRunning(): Promise<boolean> {
@@ -136,13 +151,15 @@ export async function getZapretStatus(): Promise<ZapretStatus> {
   const running = await isZapretRunning()
   const strategies = getAvailableStrategies()
   const hostsInstalled = await checkHostsInstalled()
+  const savedStrategy = meta.selectedStrategy || meta.activeStrategy || (strategies[0] ?? 'general.bat')
 
   return {
     installed,
     version: meta.version || (installed ? 'Installed' : null),
     installedAt: meta.installedAt,
     running,
-    activeStrategy: running ? meta.activeStrategy || (strategies[0] ?? 'general.bat') : null,
+    activeStrategy: running ? meta.activeStrategy || savedStrategy : null,
+    selectedStrategy: savedStrategy,
     strategies,
     hostsInstalled
   }
@@ -452,7 +469,7 @@ netsh interface tcp set global timestamps=enabled > nul 2>&1
   await new Promise((r) => setTimeout(r, 1200))
   const running = await isZapretRunning()
 
-  await saveZapretMeta({ activeStrategy: strategy })
+  await saveZapretMeta({ activeStrategy: strategy, selectedStrategy: strategy })
 
   mainWindow?.webContents.send('zapret-status-change', {
     status: running ? 'running' : 'failed',
@@ -461,6 +478,66 @@ netsh interface tcp set global timestamps=enabled > nul 2>&1
   })
 
   return { success: running, strategy }
+}
+
+export interface CustomServiceEndpoint {
+  id: string
+  name: string
+  url: string
+}
+
+export interface CustomServiceCheckResult {
+  id: string
+  name: string
+  url: string
+  ok: boolean
+  status?: number
+  latencyMs?: number
+  error?: string
+}
+
+export async function checkCustomEndpoints(
+  endpoints: CustomServiceEndpoint[],
+  timeout = 4000
+): Promise<CustomServiceCheckResult[]> {
+  return Promise.all(
+    endpoints.map(async (ep) => {
+      const startTime = Date.now()
+      try {
+        let testUrl = ep.url.trim()
+        if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+          testUrl = `https://${testUrl}`
+        }
+        const res = await axios.get(testUrl, {
+          timeout,
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          maxRedirects: 5,
+          validateStatus: (status) => status >= 200 && status < 500
+        })
+        const latencyMs = Date.now() - startTime
+        return {
+          id: ep.id,
+          name: ep.name,
+          url: testUrl,
+          ok: res.status >= 200 && res.status < 500,
+          status: res.status,
+          latencyMs
+        }
+      } catch (e) {
+        return {
+          id: ep.id,
+          name: ep.name,
+          url: ep.url,
+          ok: false,
+          latencyMs: Date.now() - startTime,
+          error: e instanceof Error ? e.message : String(e)
+        }
+      }
+    })
+  )
 }
 
 export async function checkZapretServices(timeout = 4000): Promise<ZapretServiceCheckResult> {
@@ -535,7 +612,7 @@ export async function autoSelectZapretStrategy(): Promise<{
   const candidates = [
     ...priorityList.filter((p) => allStrategies.includes(p)),
     ...allStrategies.filter((s) => !priorityList.includes(s))
-  ].slice(0, 10)
+  ]
 
   let bestStrategy = ''
   let bestScore = -1

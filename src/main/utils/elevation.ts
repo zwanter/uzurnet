@@ -22,7 +22,11 @@ export async function declineElevation(): Promise<void> {
 
 let isAdminCached: boolean | null = null
 
-async function isRunningAsAdmin(): Promise<boolean> {
+export async function isRunningAsAdmin(): Promise<boolean> {
+  if (process.platform !== 'win32') {
+    return true
+  }
+
   if (isAdminCached !== null) {
     return isAdminCached
   }

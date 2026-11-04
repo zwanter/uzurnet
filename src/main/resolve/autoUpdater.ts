@@ -165,10 +165,22 @@ export async function downloadAndInstallUpdate(version: string): Promise<void> {
 
     disableSysProxy(false)
     if (file.endsWith('.exe')) {
-      spawn(path.join(dataDir(), file), ['/S', '--force-run'], {
-        detached: true,
-        stdio: 'ignore'
-      }).unref()
+      const installerPath = path.join(dataDir(), file)
+      try {
+        // NSIS installer with perMachine: true requires Administrator elevation (UAC).
+        // Calling spawn() directly invokes CreateProcessW which fails with EACCES (error 740).
+        // We invoke PowerShell Start-Process with -Verb RunAs to properly prompt UAC.
+        const psCommand = `Start-Process -FilePath '${installerPath.replace(/'/g, "''")}' -ArgumentList '/S','--force-run' -Verb RunAs`
+        spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true
+        }).unref()
+      } catch {
+        shell.openPath(installerPath)
+      }
+      setNotQuitDialog()
+      app.quit()
     }
     if (file.endsWith('.7z')) {
       await copyFile(path.join(resourcesFilesDir(), '7za.exe'), path.join(dataDir(), '7za.exe'))

@@ -574,6 +574,7 @@ export interface ZapretStatus {
   installedAt?: number
   running: boolean
   activeStrategy: string | null
+  selectedStrategy?: string
   strategies: string[]
   hostsInstalled: boolean
 }
@@ -640,6 +641,39 @@ export async function autoSelectZapretStrategy(): Promise<{
   message?: string
 }> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('autoSelectZapretStrategy'))
+}
+
+export async function saveZapretStrategy(strategy: string): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('saveZapretStrategy', strategy))
+}
+
+export interface CustomServiceEndpoint {
+  id: string
+  name: string
+  url: string
+}
+
+export interface CustomServiceCheckResult {
+  id: string
+  name: string
+  url: string
+  ok: boolean
+  status?: number
+  latencyMs?: number
+  error?: string
+}
+
+export async function checkIsAdmin(): Promise<boolean> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('checkIsAdmin'))
+}
+
+export async function checkCustomEndpoints(
+  endpoints: CustomServiceEndpoint[],
+  timeout?: number
+): Promise<CustomServiceCheckResult[]> {
+  return ipcErrorWrapper(
+    await window.electron.ipcRenderer.invoke('checkCustomEndpoints', endpoints, timeout)
+  )
 }
 
 // Override window.alert to use toast notifications instead of system dialogs

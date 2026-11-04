@@ -21,6 +21,8 @@ interface Props {
   onConfirm?: () => void | Promise<void>
   buttons?: ConfirmButton[]
   className?: string
+  showCloseButton?: boolean
+  preventClose?: boolean
 }
 
 const ConfirmModal: React.FC<Props> = (props) => {
@@ -33,7 +35,9 @@ const ConfirmModal: React.FC<Props> = (props) => {
     cancelText,
     onConfirm,
     buttons,
-    className
+    className,
+    showCloseButton,
+    preventClose
   } = props
 
   const modalTitle = title || t('modal.pleaseConfirm')
@@ -58,7 +62,9 @@ const ConfirmModal: React.FC<Props> = (props) => {
           className={actionButtonClassName}
           onClick={async () => {
             await button.onPress()
-            closeWithAnimation()
+            if (!preventClose) {
+              closeWithAnimation()
+            }
           }}
         >
           {button.text}
@@ -68,11 +74,13 @@ const ConfirmModal: React.FC<Props> = (props) => {
 
     return (
       <>
-        <DialogClose asChild>
-          <Button size="sm" variant="ghost" className={actionButtonClassName}>
-            {modalCancelText}
-          </Button>
-        </DialogClose>
+        {!preventClose && (
+          <DialogClose asChild>
+            <Button size="sm" variant="ghost" className={actionButtonClassName}>
+              {modalCancelText}
+            </Button>
+          </DialogClose>
+        )}
         <Button
           size="sm"
           variant="destructive"
@@ -81,7 +89,9 @@ const ConfirmModal: React.FC<Props> = (props) => {
             if (onConfirm) {
               await onConfirm()
             }
-            closeWithAnimation()
+            if (!preventClose) {
+              closeWithAnimation()
+            }
           }}
         >
           {modalConfirmText}
@@ -91,8 +101,23 @@ const ConfirmModal: React.FC<Props> = (props) => {
   }
 
   return (
-    <Dialog open={true} onOpenChange={onChange}>
-      <DialogContent className={cn('w-[min(500px,calc(100%-2rem))]', className)}>
+    <Dialog
+      open={true}
+      onOpenChange={(open) => {
+        if (preventClose && !open) return
+        onChange(open)
+      }}
+    >
+      <DialogContent
+        showCloseButton={showCloseButton ?? !preventClose}
+        onPointerDownOutside={(e) => {
+          if (preventClose) e.preventDefault()
+        }}
+        onEscapeKeyDown={(e) => {
+          if (preventClose) e.preventDefault()
+        }}
+        className={cn('w-[min(500px,calc(100%-2rem))]', className)}
+      >
         <DialogClose ref={closeRef} className="hidden" />
         <DialogHeader>
           <DialogTitle>{modalTitle}</DialogTitle>

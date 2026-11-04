@@ -45,6 +45,7 @@ import KineticWave from '@renderer/components/home/kinetic-wave'
 import { cn } from '@renderer/lib/utils'
 import { parseServerNode, getPingClass } from '@renderer/utils/proxy-node'
 import CountryFlag from '@renderer/components/common/country-flag'
+import { ServiceCheckerCard } from '@renderer/components/home/service-checker-card'
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B'
@@ -389,7 +390,12 @@ const Home: React.FC = () => {
           await patchAppConfig({ proxyMode: false })
         }
 
-        const strat = zapretStatus.activeStrategy || zapretStatus.strategies[0] || 'general.bat'
+        const strat =
+          localStorage.getItem('uzurnet_selected_strategy') ||
+          zapretStatus.selectedStrategy ||
+          zapretStatus.activeStrategy ||
+          zapretStatus.strategies[0] ||
+          'general.bat'
         toast.loading('Запуск Zapret...', { id: 'zapret-toggle' })
         const res = await startZapret(strat)
         toast.dismiss('zapret-toggle')
@@ -425,6 +431,7 @@ const Home: React.FC = () => {
       toast.dismiss('zapret-autoselect')
       if (res.success && res.strategy) {
         toast.success(`Подобрана рабочая стратегия: ${res.strategy}!`)
+        localStorage.setItem('uzurnet_selected_strategy', res.strategy)
         await refreshZapret()
         setActiveMode('zapret')
       } else {
@@ -626,7 +633,11 @@ const Home: React.FC = () => {
                   </div>
                   <span className="hero-name">
                     {zapretStatus?.activeStrategy ||
-                      (zapretStatus?.installed ? 'general.bat' : 'Zapret не установлен')}
+                      (zapretStatus?.installed
+                        ? localStorage.getItem('uzurnet_selected_strategy') ||
+                          zapretStatus.selectedStrategy ||
+                          'general.bat'
+                        : 'Zapret не установлен')}
                   </span>
                   <span
                     className={cn(
@@ -752,6 +763,9 @@ const Home: React.FC = () => {
           <div className="pm-switch-knob"></div>
         </div>
       </div>
+
+      {/* ==================== SERVICE AVAILABILITY CHECKER ==================== */}
+      <ServiceCheckerCard />
 
       {/* ==================== RECOMMENDED SERVERS GRID ==================== */}
       <div className="section-head-bar">

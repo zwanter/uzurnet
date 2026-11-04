@@ -6,13 +6,10 @@ import {
   Square,
   Download,
   RefreshCw,
-  CheckCircle2,
-  XCircle,
   Shield,
   Layers,
   FileCode,
   AlertTriangle,
-  Radio,
   Sparkles
 } from 'lucide-react'
 import { Button } from '@renderer/components/ui/button'
@@ -25,18 +22,19 @@ import {
   SelectTrigger,
   SelectValue
 } from '@renderer/components/ui/select'
+import { ServiceCheckerCard } from '@renderer/components/home/service-checker-card'
+import { cn } from '@renderer/lib/utils'
 import {
   getZapretStatus,
   checkZapretRelease,
   downloadAndInstallZapret,
   startZapret,
   stopZapret,
-  checkZapretServices,
   applyZapretHosts,
   removeZapretHosts,
   autoSelectZapretStrategy,
+  saveZapretStrategy,
   ZapretStatus,
-  ZapretServiceCheckResult,
   ZapretReleaseInfo
 } from '@renderer/utils/ipc'
 
@@ -46,11 +44,11 @@ const ZapretPage: React.FC = () => {
   const [operating, setOperating] = useState<boolean>(false)
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
   const [downloadStatusText, setDownloadStatusText] = useState<string>('')
-  const [selectedStrategy, setSelectedStrategy] = useState<string>('general.bat')
+  const [selectedStrategy, setSelectedStrategy] = useState<string>(() => {
+    return localStorage.getItem('uzurnet_selected_strategy') || 'general.bat'
+  })
   const [releaseInfo, setReleaseInfo] = useState<ZapretReleaseInfo | null>(null)
   const [checkingRelease, setCheckingRelease] = useState<boolean>(false)
-  const [serviceResults, setServiceResults] = useState<ZapretServiceCheckResult | null>(null)
-  const [checkingServices, setCheckingServices] = useState<boolean>(false)
   const [hostsLoading, setHostsLoading] = useState<boolean>(false)
   const [autoSelecting, setAutoSelecting] = useState<boolean>(false)
   const [autoSelectProgressText, setAutoSelectProgressText] = useState<string>('')
@@ -59,9 +57,13 @@ const ZapretPage: React.FC = () => {
     try {
       const s = await getZapretStatus()
       setStatus(s)
+      const saved = localStorage.getItem('uzurnet_selected_strategy') || s.selectedStrategy
       if (s.activeStrategy) {
         setSelectedStrategy(s.activeStrategy)
-      } else if (s.strategies.length > 0 && !selectedStrategy) {
+        localStorage.setItem('uzurnet_selected_strategy', s.activeStrategy)
+      } else if (saved && s.strategies.includes(saved)) {
+        setSelectedStrategy(saved)
+      } else if (s.strategies.length > 0) {
         setSelectedStrategy(s.strategies[0])
       }
     } catch (e) {
@@ -69,7 +71,7 @@ const ZapretPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedStrategy])
+  }, [])
 
   useEffect(() => {
     refreshStatus()
@@ -203,9 +205,8 @@ const ZapretPage: React.FC = () => {
       if (res.success && res.strategy) {
         toast.success(`Подобрана рабочая стратегия: ${res.strategy}!`)
         setSelectedStrategy(res.strategy)
-        if (res.details) {
-          setServiceResults(res.details)
-        }
+        localStorage.setItem('uzurnet_selected_strategy', res.strategy)
+        saveZapretStrategy(res.strategy).catch(() => {})
       } else {
         toast.error(res.message || 'Не удалось найти работающую стратегию')
       }
@@ -219,24 +220,30 @@ const ZapretPage: React.FC = () => {
     }
   }
 
-  const handleCheckServices = async (): Promise<void> => {
-    setCheckingServices(true)
-    try {
-      const results = await checkZapretServices()
-      setServiceResults(results)
-      if (results.youtube && results.discord) {
-        toast.success('YouTube и Discord полностью доступны!')
-      } else if (results.youtube || results.discord) {
-        toast.warning(
-          `Частичная доступность: YouTube ${results.youtube ? 'OK' : 'FAIL'}, Discord ${results.discord ? 'OK' : 'FAIL'}`
-        )
-      } else {
-        toast.error('Сервисы недоступны. Попробуйте сменить стратегию обхода (ALT/ALT2/FAKE TLS).')
+  const handleStrategyChange = async (val: string): Promise<void> => {
+    setSelectedStrategy(val)
+    localStorage.setItem('uzurnet_selected_strategy', val)
+    saveZapretStrategy(val).catch(() => {})
+
+    // Если Zapret включен — сразу перезапускаем его с новой стратегией
+    if (status?.running) {
+      setOperating(true)
+      toast.loading(`Переключение на «${val}»...`, { id: 'zapret-switch' })
+      try {
+        const res = await startZapret(val)
+        toast.dismiss('zapret-switch')
+        if (res.success) {
+          toast.success(`Zapret переключен на: ${val}`)
+        } else {
+          toast.error('Не удалось переключить стратегию')
+        }
+        await refreshStatus()
+      } catch (e) {
+        toast.dismiss('zapret-switch')
+        toast.error(`Ошибка переключения: ${e instanceof Error ? e.message : String(e)}`)
+      } finally {
+        setOperating(false)
       }
-    } catch (e) {
-      toast.error(`Ошибка проверки: ${e instanceof Error ? e.message : String(e)}`)
-    } finally {
-      setCheckingServices(false)
     }
   }
 
@@ -378,7 +385,7 @@ const ZapretPage: React.FC = () => {
                 <label className="text-xs font-medium text-foreground/80">Активный сценарий:</label>
                 <Select
                   value={selectedStrategy}
-                  onValueChange={(val) => setSelectedStrategy(val)}
+                  onValueChange={handleStrategyChange}
                   disabled={operating}
                 >
                   <SelectTrigger className="w-full bg-background dark:bg-black/30 border-border dark:border-white/10 text-foreground font-mono text-sm">
@@ -406,10 +413,10 @@ const ZapretPage: React.FC = () => {
                 size="sm"
                 onClick={handleAutoSelect}
                 disabled={autoSelecting || operating}
-                className="bg-amber-600 hover:bg-amber-500 text-white w-full flex items-center justify-center gap-2 shadow-xs"
+                className="bg-amber-600 hover:bg-amber-500 text-white w-full flex items-center justify-center gap-2 shadow-xs text-xs px-2.5 overflow-hidden min-w-0"
               >
-                <Sparkles className={`w-3.5 h-3.5 ${autoSelecting ? 'animate-spin' : ''}`} />
-                <span>
+                <Sparkles className={cn('size-3.5 shrink-0', autoSelecting && 'animate-spin')} />
+                <span className="truncate">
                   {autoSelecting
                     ? autoSelectProgressText || 'Подбор рабочей стратегии...'
                     : '⚡ Автоподбор рабочей стратегии'}
@@ -487,134 +494,7 @@ const ZapretPage: React.FC = () => {
       </div>
 
       {/* Service Availability Tester Card */}
-      <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md space-y-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
-              <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <h2 className="text-base font-semibold text-foreground">Проверка доступности сервисов</h2>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Прямое тестирование доступности без пинга (проверяет реальный пропуск потоков
-              googlevideo и discord gateway через DPI).
-            </p>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={handleCheckServices}
-            disabled={checkingServices}
-            className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border shrink-0 shadow-xs"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-2 ${checkingServices ? 'animate-spin' : ''}`} />
-            Проверить доступность
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          {/* YouTube Status */}
-          <div className="p-4 rounded-xl border border-border/60 dark:border-white/5 bg-muted/40 dark:bg-black/30 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
-                YouTube
-              </span>
-              {serviceResults ? (
-                serviceResults.youtube ? (
-                  <Badge className="bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
-                    Доступен
-                  </Badge>
-                ) : (
-                  <Badge className="bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30">
-                    Заблокирован
-                  </Badge>
-                )
-              ) : (
-                <Badge variant="outline" className="text-muted-foreground border-border/60">
-                  Не проверялся
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
-                <span>Веб-интерфейс (youtube.com):</span>
-                {serviceResults ? (
-                  serviceResults.details.youtubeWeb ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  )
-                ) : (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
-                <span>Видеопоток (googlevideo):</span>
-                {serviceResults ? (
-                  serviceResults.details.youtubeVideo ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  )
-                ) : (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Discord Status */}
-          <div className="p-4 rounded-xl border border-border/60 dark:border-white/5 bg-muted/40 dark:bg-black/30 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
-                Discord
-              </span>
-              {serviceResults ? (
-                serviceResults.discord ? (
-                  <Badge className="bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
-                    Доступен
-                  </Badge>
-                ) : (
-                  <Badge className="bg-rose-500/15 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30">
-                    Заблокирован
-                  </Badge>
-                )
-              ) : (
-                <Badge variant="outline" className="text-muted-foreground border-border/60">
-                  Не проверялся
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
-                <span>Веб-клиент (discord.com):</span>
-                {serviceResults ? (
-                  serviceResults.details.discordWeb ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  )
-                ) : (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center text-foreground/80 dark:text-zinc-400">
-                <span>Голос и шлюз (gateway):</span>
-                {serviceResults ? (
-                  serviceResults.details.discordGateway ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  )
-                ) : (
-                  <span className="text-muted-foreground/60">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ServiceCheckerCard />
 
       {/* Hosts Optimization Card */}
       <div className="rounded-2xl border border-border/60 dark:border-white/5 bg-card/70 dark:bg-card/40 p-5 backdrop-blur-md space-y-4 shadow-xs">

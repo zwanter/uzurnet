@@ -8,8 +8,8 @@ import routes from '@renderer/routes'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import {
   applyTheme,
+  checkIsAdmin,
   checkUpdate,
-  declineElevation,
   getAppConfig,
   getVersion,
   needsFirstRunAdmin,
@@ -97,7 +97,6 @@ const App: React.FC = () => {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false)
   const [showProfileInstallConfirm, setShowProfileInstallConfirm] = useState(false)
   const [showAdminRequired, setShowAdminRequired] = useState(false)
-  const adminRestartRequestedRef = useRef(false)
   const profileInstallConfirmedRef = useRef(false)
   const [profileInstallData, setProfileInstallData] = useState<{
     url: string
@@ -162,9 +161,17 @@ const App: React.FC = () => {
     window.electron.ipcRenderer.on('autoSelectCompleted', handleAutoSelectCompleted)
 
     if (platform === 'win32') {
-      needsFirstRunAdmin().then((needs) => {
-        if (needs) setShowAdminRequired(true)
-      })
+      checkIsAdmin()
+        .then((isAdmin) => {
+          if (!isAdmin) {
+            setShowAdminRequired(true)
+          }
+        })
+        .catch(() => {
+          needsFirstRunAdmin().then((needs) => {
+            if (needs) setShowAdminRequired(true)
+          })
+        })
     }
 
     return (): void => {
@@ -259,28 +266,34 @@ const App: React.FC = () => {
       )}
       {showAdminRequired && (
         <ConfirmModal
-          title={t('modal.adminRequired')}
+          preventClose={true}
+          showCloseButton={false}
+          title={t('modal.adminRequired', 'Требуются права администратора')}
           description={
-            <div>
-              <p className="text-sm">{t('modal.adminRequiredDesc')}</p>
+            <div className="space-y-2 py-1 text-left">
+              <p className="text-sm text-foreground/90 font-medium">
+                {t(
+                  'modal.adminRequiredDesc',
+                  'Для работы приложения, сетевого TUN-драйвера и обхода блокировок Zapret DPI необходим запуск от имени администратора.'
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Пожалуйста, нажмите кнопку ниже, чтобы перезапустить приложение с правами администратора.
+              </p>
             </div>
           }
-          confirmText={t('modal.restartAsAdmin')}
-          cancelText={t('modal.continueWithoutAdmin')}
-          onChange={(open) => {
-            if (!open) {
-              setShowAdminRequired(false)
-              if (!adminRestartRequestedRef.current) {
-                declineElevation().catch(() => {})
-              }
-              adminRestartRequestedRef.current = false
-            }
+          confirmText={t('modal.restartAsAdmin', 'Перезапустить от имени администратора')}
+          onChange={() => {
+            // Cannot be closed
           }}
           onConfirm={async () => {
-            adminRestartRequestedRef.current = true
-            await restartAsAdmin()
+            try {
+              await restartAsAdmin()
+            } catch (err) {
+              toast.error(`Ошибка перезапуска: ${err instanceof Error ? err.message : String(err)}`)
+            }
           }}
-          className="guide-admin-required-modal"
+          className="guide-admin-required-modal border-rose-500/30"
         />
       )}
       <HwidLimitAlert />

@@ -72,9 +72,12 @@ import {
   startZapret,
   stopZapret,
   checkZapretServices,
+  checkCustomEndpoints,
+  CustomServiceEndpoint,
   applyZapretHosts,
   removeZapretHosts,
-  autoSelectZapretStrategy
+  autoSelectZapretStrategy,
+  saveSelectedStrategy
 } from '../resolve/zapret'
 import {
   checkElevateTask,
@@ -128,7 +131,7 @@ import {
   resolveThemes,
   writeTheme
 } from '../resolve/theme'
-import { declineElevation, ELEVATION_DECLINED_ARG } from './elevation'
+import { declineElevation, ELEVATION_DECLINED_ARG, isRunningAsAdmin } from './elevation'
 import { safeSend } from './safeSend'
 import { logDir } from './dirs'
 import path from 'path'
@@ -472,7 +475,14 @@ export function registerIpcMainHandlers(): void {
   )
   ipcMain.handle('stopZapret', () => ipcErrorWrapper(stopZapret)())
   ipcMain.handle('checkZapretServices', () => ipcErrorWrapper(checkZapretServices)())
+  ipcMain.handle('checkIsAdmin', () => ipcErrorWrapper(isRunningAsAdmin)())
+  ipcMain.handle('checkCustomEndpoints', (_e, endpoints: CustomServiceEndpoint[], timeout?: number) =>
+    ipcErrorWrapper(async () => checkCustomEndpoints(endpoints, timeout))()
+  )
   ipcMain.handle('applyZapretHosts', () => ipcErrorWrapper(applyZapretHosts)())
   ipcMain.handle('removeZapretHosts', () => ipcErrorWrapper(removeZapretHosts)())
   ipcMain.handle('autoSelectZapretStrategy', () => ipcErrorWrapper(autoSelectZapretStrategy)())
+  ipcMain.handle('saveZapretStrategy', (_e, strategy: string) =>
+    ipcErrorWrapper(async () => saveSelectedStrategy(strategy))()
+  )
 }

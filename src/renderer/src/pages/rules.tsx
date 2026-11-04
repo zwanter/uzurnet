@@ -38,6 +38,7 @@ const Rules: React.FC = () => {
   return (
     <BasePage
       title={t('pages.rules.title')}
+      contentClassName="flex flex-col h-full overflow-hidden"
       header={
         <>
           {profileConfig?.current && (
@@ -97,10 +98,12 @@ const Rules: React.FC = () => {
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        <Separator className="mx-2"/>
+        <Separator className="mx-2" />
       </div>
-      <div className="h-[calc(100vh-108px)] mt-px">
+      <div className="flex-1 min-h-0 mt-2 mb-2 mr-3 rounded-xl border border-border/60 dark:border-white/10 bg-card/40 backdrop-blur-xs p-1 shadow-xs overflow-hidden">
         <Virtuoso
+          style={{ height: '100%' }}
+          className="h-full pr-1.5"
           data={filteredRules}
           itemContent={(i, rule) => (
             <RuleItem
