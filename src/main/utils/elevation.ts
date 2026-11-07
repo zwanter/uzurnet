@@ -27,18 +27,52 @@ export async function isRunningAsAdmin(): Promise<boolean> {
     return true
   }
 
-  if (isAdminCached !== null) {
-    return isAdminCached
+  if (isAdminCached === true) {
+    return true
   }
 
+  // Method 1: fsutil dirty query (fast NTFS check, no services needed)
+  try {
+    const drive = process.env.SystemDrive || 'C:'
+    await execFilePromise('fsutil', ['dirty', 'query', drive], { timeout: 2000 })
+    isAdminCached = true
+    return true
+  } catch {}
+
+  // Method 2: fltmc (Filter Manager query)
+  try {
+    await execFilePromise('fltmc', [], { timeout: 2000 })
+    isAdminCached = true
+    return true
+  } catch {}
+
+  // Method 3: net session (fallback if LanmanServer is running)
   try {
     await execFilePromise('net', ['session'], { timeout: 2000 })
     isAdminCached = true
     return true
-  } catch {
-    isAdminCached = false
-    return false
-  }
+  } catch {}
+
+  // Method 4: PowerShell WindowsPrincipal IsInRole check
+  try {
+    const { stdout } = await execFilePromise(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)'
+      ],
+      { timeout: 3000 }
+    )
+    if (stdout && stdout.trim().toLowerCase() === 'true') {
+      isAdminCached = true
+      return true
+    }
+  } catch {}
+
+  return false
 }
 
 export async function execWithElevation(command: string, args: string[]): Promise<void> {

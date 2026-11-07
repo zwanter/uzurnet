@@ -12,7 +12,6 @@ import {
   checkUpdate,
   getAppConfig,
   getVersion,
-  needsFirstRunAdmin,
   restartAsAdmin,
   setNativeTheme
 } from '@renderer/utils/ipc'
@@ -124,8 +123,13 @@ const App: React.FC = () => {
     }
     window.electron.ipcRenderer.on('showError', handleShowError)
 
-    const handleNeedsAdminSetup = (): void => {
-      setShowAdminRequired(true)
+    const handleNeedsAdminSetup = async (): Promise<void> => {
+      const isAdmin = await checkIsAdmin().catch(() => false)
+      if (!isAdmin) {
+        setShowAdminRequired(true)
+      } else {
+        setShowAdminRequired(false)
+      }
     }
     window.electron.ipcRenderer.on('needs-admin-setup', handleNeedsAdminSetup)
 
@@ -165,12 +169,12 @@ const App: React.FC = () => {
         .then((isAdmin) => {
           if (!isAdmin) {
             setShowAdminRequired(true)
+          } else {
+            setShowAdminRequired(false)
           }
         })
         .catch(() => {
-          needsFirstRunAdmin().then((needs) => {
-            if (needs) setShowAdminRequired(true)
-          })
+          setShowAdminRequired(false)
         })
     }
 

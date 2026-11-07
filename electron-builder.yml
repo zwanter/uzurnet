@@ -28,6 +28,7 @@ win:
     - nsis
     - 7z
   artifactName: UzurNet_${arch}-portable.${ext}
+  requestedExecutionLevel: requireAdministrator
 nsis:
   artifactName: UzurNet_${arch}-setup.${ext}
   uninstallDisplayName: UzurNet

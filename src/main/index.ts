@@ -20,7 +20,7 @@ import { existsSync, writeFileSync } from 'fs'
 import { exePath, taskDir } from './utils/dirs'
 import { showFloatingWindow } from './resolve/floatingWindow'
 import { getAppConfigSync } from './config/app'
-import { declineElevation, ELEVATION_DECLINED_ARG } from './utils/elevation'
+import { declineElevation, ELEVATION_DECLINED_ARG, isRunningAsAdmin } from './utils/elevation'
 import { t } from './utils/i18n'
 
 
@@ -373,7 +373,8 @@ app.whenReady().then(async () => {
     mainWindow?.webContents.send('core-started')
   }
 
-  if (needsFirstRunAdmin) {
+  const adminActive = await isRunningAsAdmin()
+  if (!adminActive && needsFirstRunAdmin) {
     mainWindow?.webContents.send('needs-admin-setup')
   }
 
